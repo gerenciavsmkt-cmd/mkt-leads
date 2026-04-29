@@ -19,7 +19,12 @@ const DEFAULT_BGS = {
 const getEmbedUrl = (url: string) => {
   if (!url) return '';
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    const id = url.includes('v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
+    let id = '';
+    if (url.includes('v=')) {
+      id = url.split('v=')[1]?.split('&')[0];
+    } else {
+      id = url.split('/').pop()?.split('?')[0] || '';
+    }
     return `https://www.youtube.com/embed/${id}?autoplay=0&rel=0`;
   }
   if (url.includes('vimeo.com')) {
@@ -406,6 +411,43 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
             <a href={config.downloadFileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ marginTop: '2rem', display: 'inline-flex', padding: '1rem 2rem' }}>Baixar Material Agora</a>
           )}
         </div>
+      </div>
+    );
+  }
+
+  if (page.templateId === 'vsl') {
+    return (
+      <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, background: currentBg ? `url("${currentBg}") center/cover no-repeat fixed` : 'none', zIndex: -2 }} />
+        <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95))', zIndex: -1 }} />
+        
+        <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', padding: '4rem 1.5rem', textAlign: 'center' }}>
+          <div style={{ marginBottom: '2.5rem' }}>
+            {config.logoUrl && config.logoUrl !== 'none' ? <img src={config.logoUrl} style={{ maxHeight: '50px', margin: '0 auto' }} /> : <h1 style={{ fontSize: '1.5rem' }}>{config.titulo}</h1>}
+          </div>
+
+          <h2 style={{ fontSize: '2.75rem', fontWeight: 800, marginBottom: '1.5rem', lineHeight: 1.2 }}>
+            {config.subtitulo} <span style={{ color: config.botaoColor || '#fbbf24' }}>{config.destaque}</span>
+          </h2>
+          
+          <p style={{ fontSize: '1.1rem', opacity: 0.9, marginBottom: '2.5rem', maxWidth: '700px', margin: '0 auto 2.5rem' }}>
+            {config.descricao}
+          </p>
+
+          <div style={{ width: '100%', background: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', position: 'relative', paddingBottom: '56.25%', height: 0, marginBottom: '4rem', border: '4px solid rgba(255,255,255,0.1)' }}>
+            <iframe 
+              src={getEmbedUrl(config.videoUrl || '')} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowFullScreen
+            />
+          </div>
+
+          <div id="vsl-form" style={{ maxWidth: '500px', margin: '0 auto' }}>
+            <CaptureForm config={config} onSubmit={handleFormSubmit} />
+          </div>
+        </div>
+        <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
       </div>
     );
   }
