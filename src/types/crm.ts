@@ -127,6 +127,7 @@ export interface Settings {
     logoUrl?: string;
     headerColor?: string;
     ogLogoUrl?: string;
+    faviconUrl?: string;
   };
   empresa: {
     website: string;

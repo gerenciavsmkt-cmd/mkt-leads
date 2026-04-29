@@ -53,12 +53,21 @@ export default function UsuariosPage() {
 
   const handleSaveEdit = async () => {
     if (!editingUser) return;
-    await api.updateUserProfile(editingUser.uid, {
-      name: editForm.name,
-      role: editForm.role
-    });
-    setEditingUser(null);
-    loadUsers();
+    setLoading(true);
+    try {
+      await api.updateUserProfile(editingUser.uid, {
+        name: editForm.name,
+        role: editForm.role
+      });
+      setEditingUser(null);
+      await loadUsers();
+      alert('Usuário atualizado com sucesso!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao salvar: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredUsers = users.filter(user => 

@@ -6,14 +6,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const snap = await getDoc(doc(db, 'settings', 'global'));
+    const snap = await getDoc(doc(db, 'settings', 'visual'));
     
     if (!snap.exists()) {
       return new NextResponse('Not found', { status: 404 });
     }
 
     const settings = snap.data();
-    const base64 = settings?.landingPage?.ogLogoUrl || settings?.landingPage?.logoUrl;
+    const base64 = settings?.ogLogoUrl || settings?.logoUrl;
 
     if (!base64 || !base64.startsWith('data:image')) {
       return new NextResponse('Not found or not base64', { status: 404 });

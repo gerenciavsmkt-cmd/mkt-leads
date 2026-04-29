@@ -22,8 +22,16 @@ import {
   MessageCircle,
   Smartphone,
   LogIn,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot 
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { UserProfile } from '@/types/crm';
 
 export default function ClientLayout({
@@ -53,6 +61,7 @@ export default function ClientLayout({
   const [notification, setNotification] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -112,6 +121,31 @@ export default function ClientLayout({
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
+
+  useEffect(() => {
+    if (userProfile?.role !== 'admin') return;
+
+    const q = query(collection(db, 'users'), where('status', '==', 'pending'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPendingUsersCount(snapshot.size);
+      
+      // Se houver novos pedidos, mostra uma notificação interna
+      if (!snapshot.empty) {
+        const lastUser = snapshot.docs[0].data() as UserProfile;
+        
+        // Verifica se é uma mudança real e não apenas o carregamento inicial
+        // (Simplificando: se o count mudou pra cima, avisamos)
+        setNotification({
+          type: 'auth',
+          title: 'Solicitação de Acesso',
+          message: `${lastUser.name || lastUser.email} está aguardando aprovação.`,
+          data: lastUser
+        });
+        setTimeout(() => setNotification(null), 10000);
+      }
+    });
+    return () => unsubscribe();
+  }, [userProfile?.role]);
 
   if (isCapturePage) {
     return (
@@ -174,9 +208,28 @@ export default function ClientLayout({
               <span className="nav-text">Configurações</span>
             </Link>
             {userProfile?.role === 'admin' && (
-              <Link href="/usuarios" className={`nav-link ${pathname === '/usuarios' ? 'active' : ''}`}>
+              <Link href="/usuarios" className={`nav-link ${pathname === '/usuarios' ? 'active' : ''}`} style={{ position: 'relative' }}>
                 <ShieldCheck size={20} />
                 <span className="nav-text">Usuários</span>
+                {pendingUsersCount > 0 && (
+                  <span style={{ 
+                    position: 'absolute', 
+                    right: '0.75rem', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    background: 'var(--danger)', 
+                    color: 'white', 
+                    fontSize: '0.65rem', 
+                    fontWeight: 800, 
+                    padding: '2px 6px', 
+                    borderRadius: '10px',
+                    minWidth: '18px',
+                    textAlign: 'center',
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)'
+                  }}>
+                    {pendingUsersCount}
+                  </span>
+                )}
               </Link>
             )}
           </nav>
@@ -219,8 +272,8 @@ export default function ClientLayout({
             animation: 'slideInRight 0.3s ease-out'
           }}>
             <div style={{ 
-              background: notification.type === 'lead' ? 'var(--success-bg)' : 'var(--accent)', 
-              color: notification.type === 'lead' ? 'var(--success)' : 'var(--primary)',
+              background: notification.type === 'lead' ? 'var(--success-bg)' : notification.type === 'auth' ? 'rgba(245, 158, 11, 0.1)' : 'var(--accent)', 
+              color: notification.type === 'lead' ? 'var(--success)' : notification.type === 'auth' ? '#d97706' : 'var(--primary)',
               padding: '0.75rem',
               borderRadius: '10px',
               display: 'flex',
@@ -228,7 +281,7 @@ export default function ClientLayout({
               justifyContent: 'center',
               height: 'fit-content'
             }}>
-              {notification.type === 'lead' ? <UserPlus size={24} /> : <Bell size={24} />}
+              {notification.type === 'lead' ? <UserPlus size={24} /> : notification.type === 'auth' ? <ShieldAlert size={24} /> : <Bell size={24} />}
             </div>
             
             <div style={{ flex: 1 }}>

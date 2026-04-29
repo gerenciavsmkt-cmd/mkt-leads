@@ -42,7 +42,8 @@ export default function ConfigPage() {
       formColor: '',
       logoUrl: '',
       backgroundUrl: '',
-      ogLogoUrl: ''
+      ogLogoUrl: '',
+      faviconUrl: ''
     },
     empresa: {
       website: '',
@@ -99,7 +100,7 @@ export default function ConfigPage() {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          resolve(canvas.toDataURL('image/webp', quality));
         };
       };
     });
@@ -125,6 +126,18 @@ export default function ConfigPage() {
     setSettings(prev => ({ 
       ...prev, 
       landingPage: { ...prev.landingPage, ogLogoUrl: compressed }
+    }));
+  };
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Favicon deve ser bem pequeno
+    const compressed = await compressImage(file, 64, 64, 0.8);
+    setSettings(prev => ({ 
+      ...prev, 
+      landingPage: { ...prev.landingPage, faviconUrl: compressed }
     }));
   };
 
@@ -264,6 +277,34 @@ export default function ConfigPage() {
               <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
                 Esta imagem aparecerá quando você compartilhar o link da sua página. Recomendado: 1200x630px.
               </p>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                Favicon (Ícone da Aba do Navegador)
+              </label>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleFaviconUpload}
+                  style={{ fontSize: '0.875rem' }}
+                />
+                {settings.landingPage?.faviconUrl && (
+                  <button 
+                    className="btn btn-outline"
+                    style={{ fontSize: '0.75rem', height: '32px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                    onClick={() => setSettings(prev => ({ ...prev, landingPage: { ...prev.landingPage, faviconUrl: '' } }))}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+              {settings.landingPage?.faviconUrl && settings.landingPage.faviconUrl.startsWith('data:image') && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img src={settings.landingPage.faviconUrl} alt="Favicon" style={{ width: '32px', height: '32px', objectFit: 'contain', border: '1px solid var(--border)', padding: '2px', borderRadius: '4px' }} />
+                </div>
+              )}
             </div>
             
             <div>

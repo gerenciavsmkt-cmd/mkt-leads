@@ -221,27 +221,28 @@ export const api = {
   // Settings
   getSettings: async (): Promise<Settings> => {
     try {
-      const settingsRef = doc(db, COLLECTIONS.SETTINGS, 'global');
-      const snap = await getDoc(settingsRef);
+      const docRef = doc(db, COLLECTIONS.SETTINGS, 'global');
+      const visualRef = doc(db, COLLECTIONS.SETTINGS, 'visual');
       
-      if (!snap.exists()) {
-        await setDoc(settingsRef, initialSettings);
-        return initialSettings;
-      }
+      const [snap, visualSnap] = await Promise.all([getDoc(docRef), getDoc(visualRef)]);
       
-      const settings = snap.data() as Settings;
-      
-      // Garantir que campos novos existam e evitar erros de campos nulos
+      let settings = snap.exists() ? snap.data() as Settings : initialSettings;
+      let visualData = visualSnap.exists() ? visualSnap.data() : {};
+
+      // Mesclar dados
       return {
         ...initialSettings,
         ...settings,
         notificacoes: { ...initialSettings.notificacoes, ...(settings.notificacoes || {}) },
-        landingPage: { ...initialSettings.landingPage, ...(settings.landingPage || {}) },
-        empresa: { ...initialSettings.empresa, ...(settings.empresa || {}) },
-        whatsappWidget: { 
-          ...initialSettings.whatsappWidget, 
-          ...(settings.whatsappWidget || {}) 
-        } as any
+        landingPage: { 
+          ...initialSettings.landingPage, 
+          ...(settings.landingPage || {}),
+          logoUrl: visualData.logoUrl || settings.landingPage?.logoUrl || '',
+          ogLogoUrl: visualData.ogLogoUrl || settings.landingPage?.ogLogoUrl || '',
+          faviconUrl: visualData.faviconUrl || settings.landingPage?.faviconUrl || '',
+          backgroundUrl: visualData.backgroundUrl || settings.landingPage?.backgroundUrl || ''
+        },
+        empresa: { ...initialSettings.empresa, ...(settings.empresa || {}) }
       };
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -250,7 +251,32 @@ export const api = {
   },
 
   saveSettings: async (settings: Settings) => {
-    await setDoc(doc(db, COLLECTIONS.SETTINGS, 'global'), settings);
+    // Separar imagens pesadas
+    const { logoUrl, ogLogoUrl, faviconUrl, backgroundUrl, ...otherLp } = settings.landingPage || {};
+    
+    const visualData = {
+      logoUrl: logoUrl || '',
+      ogLogoUrl: ogLogoUrl || '',
+      faviconUrl: faviconUrl || '',
+      backgroundUrl: backgroundUrl || ''
+    };
+
+    const baseSettings = {
+      ...settings,
+      landingPage: {
+        ...otherLp,
+        // Mantemos 'none' ou strings curtas no global para não dar erro
+        logoUrl: logoUrl?.startsWith('data:') ? 'none' : (logoUrl || ''),
+        ogLogoUrl: ogLogoUrl?.startsWith('data:') ? 'none' : (ogLogoUrl || ''),
+        faviconUrl: faviconUrl?.startsWith('data:') ? 'none' : (faviconUrl || ''),
+        backgroundUrl: backgroundUrl?.startsWith('data:') ? 'none' : (backgroundUrl || '')
+      }
+    };
+
+    await Promise.all([
+      setDoc(doc(db, COLLECTIONS.SETTINGS, 'global'), baseSettings),
+      setDoc(doc(db, COLLECTIONS.SETTINGS, 'visual'), visualData)
+    ]);
     return settings;
   },
 
@@ -355,7 +381,7 @@ export const api = {
 
   updateUserProfile: async (uid: string, data: Partial<UserProfile>) => {
     const userRef = doc(db, COLLECTIONS.USERS, uid);
-    await updateDoc(userRef, data);
+    await setDoc(userRef, data, { merge: true });
   },
 
   getAllUserProfiles: async (): Promise<UserProfile[]> => {
