@@ -360,7 +360,7 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
                     <div key={at.id} onClick={() => { setSelectedAttendant(at); setShowForm(true); }} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', borderRadius: '12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}>
                        <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#f1f5f9', overflow: 'hidden' }}>{at.avatarUrl ? <img src={at.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={24} color="#94a3b8" />}</div>
                        <div style={{ flex: 1 }}><h4 style={{ fontWeight: 700, color: '#1e293b' }}>{at.nome}</h4><p style={{ fontSize: '0.75rem', color: '#64748b' }}>{at.cargo}</p></div>
-                       <MessageCircle size={18} color="#25D366" />
+                       {renderBioSocialIcon('whatsapp', 18, "#25D366")}
                     </div>
                  )) : (
                   <form onSubmit={handleStartChat} style={{ padding: '0.5rem' }}>

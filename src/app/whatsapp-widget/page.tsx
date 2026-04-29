@@ -97,7 +97,7 @@ export default function WhatsappWidgetStandalone() {
                           {at.avatarUrl ? (
                             <img src={at.avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
-                            <User size={20} color="#94a3b8" />
+                            renderOfficialWhatsappIcon(24, "#25D366")
                           )}
                        </div>
                        <div style={{ flex: 1 }}>
@@ -105,7 +105,7 @@ export default function WhatsappWidgetStandalone() {
                           <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0 }}>{at.cargo}</p>
                           {at.disponibilidade && <p style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 600, marginTop: '2px' }}>{at.disponibilidade}</p>}
                        </div>
-                       <MessageCircle size={16} color="#25D366" />
+                       {renderOfficialWhatsappIcon(18, "#25D366")}
                     </div>
                  ))
                ) : (
