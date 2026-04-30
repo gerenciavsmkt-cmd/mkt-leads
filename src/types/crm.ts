@@ -7,6 +7,7 @@ export interface Lead {
   nome: string;
   email: string;
   telefone?: string;
+  celular?: string;
   empresa?: string;
   origem: string;
   dataCriacao: string;

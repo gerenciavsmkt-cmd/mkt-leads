@@ -31,6 +31,10 @@ export default function LeadsPage() {
   const [viewingLead, setViewingLead] = useState<Lead | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -49,6 +53,7 @@ export default function LeadsPage() {
     nome: '',
     email: '',
     telefone: '',
+    celular: '',
     origem: 'Manual',
     status: 'novo' as LeadStatus,
     tags: '',
@@ -73,6 +78,7 @@ export default function LeadsPage() {
       nome: formData.nome,
       email: formData.email,
       telefone: formData.telefone,
+      celular: formData.celular,
       origem: formData.origem,
       dataCriacao: editingLead?.dataCriacao || new Date().toISOString(),
       status: formData.status,
@@ -96,6 +102,7 @@ export default function LeadsPage() {
         nome: lead.nome,
         email: lead.email,
         telefone: lead.telefone || '',
+        celular: lead.celular || '',
         origem: lead.origem,
         status: lead.status,
         tags: lead.tags.join(', '),
@@ -110,6 +117,7 @@ export default function LeadsPage() {
         nome: '',
         email: '',
         telefone: '',
+        celular: '',
         origem: 'Manual',
         status: 'novo',
         tags: '',
@@ -225,7 +233,8 @@ export default function LeadsPage() {
       // Encontrar índices únicos para cada campo
       const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
       const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
-      const idxTelefone = headers.findIndex(h => h.includes('telefone') || h.includes('celular') || h.includes('phone') || h.includes('mobile'));
+      const idxTelefone = headers.findIndex(h => h.toLowerCase() === 'telefone');
+      const idxCelular = headers.findIndex(h => h.includes('celular') || h.includes('mobile'));
       const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company') || h.includes('cargo'));
       const idxCidade = headers.findIndex(h => h.includes('cidade') || h.includes('city'));
       const idxEstado = headers.findIndex(h => h.includes('estado') || h.includes('state') || h.includes('uf'));
@@ -238,10 +247,10 @@ export default function LeadsPage() {
         
         const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
         
-        // Garantir que não pegamos o mesmo índice para campos diferentes se o split falhar
         const email = (idxEmail !== -1 && cols[idxEmail]) ? cols[idxEmail] : '';
         const nome = (idxNome !== -1 && idxNome !== idxEmail && cols[idxNome]) ? cols[idxNome] : (email ? 'Sem Nome' : '');
         const telefone = (idxTelefone !== -1 && idxTelefone !== idxEmail && cols[idxTelefone]) ? cols[idxTelefone] : '';
+        const celular = (idxCelular !== -1 && idxCelular !== idxEmail && cols[idxCelular]) ? cols[idxCelular] : '';
         const empresa = (idxEmpresa !== -1 && idxEmpresa !== idxEmail && cols[idxEmpresa]) ? cols[idxEmpresa] : '';
         const cidade = (idxCidade !== -1 && cols[idxCidade]) ? cols[idxCidade] : '';
         const estado = (idxEstado !== -1 && cols[idxEstado]) ? cols[idxEstado] : '';
@@ -252,6 +261,7 @@ export default function LeadsPage() {
             nome: nome || 'Sem Nome',
             email: email,
             telefone: telefone,
+            celular: celular,
             empresa: empresa,
             cidade: cidade,
             estado: estado,
@@ -280,6 +290,17 @@ export default function LeadsPage() {
     lead.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentLeads = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedLeads(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -295,41 +316,55 @@ export default function LeadsPage() {
   };
 
   return (
-    <div>
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>Gerenciamento de Leads</h2>
-          <p style={{ opacity: 0.6 }}>Total de {leads.length} leads cadastrados.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn btn-outline" onClick={handleExportLeads}>
-            <Download size={18} /> Exportar Backup
-          </button>
-          <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
-            <Upload size={18} /> Importar Planilha
-          </button>
-          <button className="btn btn-primary" onClick={() => openModal()}>
-            <UserPlus size={18} /> Novo Lead
-          </button>
-        </div>
-      </header>
-
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
-            <input 
-              type="text" 
-              placeholder="Buscar por nome ou e-mail..." 
-              className="btn-outline"
-              style={{ width: '100%', paddingLeft: '2.5rem', borderRadius: 'var(--radius)', height: '42px', border: '1px solid var(--border)' }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+    <div style={{ paddingBottom: '2rem' }}>
+      {/* HEADER FIXO */}
+      <div style={{ 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 50, 
+        background: 'var(--background)', 
+        paddingTop: '1rem',
+        borderBottom: '1px solid var(--border)',
+        marginBottom: '1.5rem'
+      }}>
+        <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>Gerenciamento de Leads</h2>
+            <p style={{ opacity: 0.6 }}>Total de {leads.length} leads cadastrados.</p>
           </div>
-          <button className="btn btn-outline">
-            <Filter size={18} /> Filtros
-          </button>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button className="btn btn-outline" onClick={handleExportLeads}>
+              <Download size={18} /> Exportar Backup
+            </button>
+            <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
+              <Upload size={18} /> Importar Planilha
+            </button>
+            <button className="btn btn-primary" onClick={() => openModal()}>
+              <UserPlus size={18} /> Novo Lead
+            </button>
+          </div>
+        </header>
+
+        <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
+              <input 
+                type="text" 
+                placeholder="Buscar por nome ou e-mail..." 
+                className="btn-outline"
+                style={{ width: '100%', paddingLeft: '2.5rem', borderRadius: 'var(--radius)', height: '42px', border: '1px solid var(--border)' }}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1); // Volta para pag 1 ao buscar
+                }}
+              />
+            </div>
+            <button className="btn btn-outline">
+              <Filter size={18} /> Filtros
+            </button>
+          </div>
         </div>
       </div>
 
@@ -356,7 +391,7 @@ export default function LeadsPage() {
               </th>
               <th>Nome</th>
               <th>E-mail</th>
-              <th>Telefone</th>
+              <th>Celular</th>
               <th>Empresa</th>
               <th>Origem</th>
               <th>Data</th>
@@ -366,14 +401,14 @@ export default function LeadsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredLeads.map(lead => (
+            {currentLeads.map(lead => (
               <tr key={lead.id}>
                 <td>
                   <input type="checkbox" checked={selectedLeads.includes(lead.id)} onChange={() => toggleSelect(lead.id)} />
                 </td>
                 <td style={{ fontWeight: 500 }}>{lead.nome}</td>
                 <td style={{ opacity: 0.8 }}>{lead.email}</td>
-                <td>{lead.telefone || '-'}</td>
+                <td>{lead.celular || '-'}</td>
                 <td>{lead.empresa || '-'}</td>
                 <td>{lead.origem}</td>
                 <td>{new Date(lead.dataCriacao).toLocaleDateString('pt-BR')}</td>
@@ -402,6 +437,62 @@ export default function LeadsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* PAGINAÇÃO */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginTop: '1.5rem',
+        padding: '1rem',
+        background: 'var(--card)',
+        borderRadius: 'var(--radius)',
+        border: '1px solid var(--border)'
+      }}>
+        <div style={{ opacity: 0.6, fontSize: '0.875rem' }}>
+          Exibindo {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredLeads.length)} de {filteredLeads.length} leads
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            className="btn btn-outline" 
+            disabled={currentPage === 1}
+            onClick={() => goToPage(currentPage - 1)}
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            Anterior
+          </button>
+          
+          <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum = currentPage <= 3 ? i + 1 : currentPage + i - 2;
+              if (pageNum > totalPages) pageNum = totalPages - (Math.min(5, totalPages) - i - 1);
+              if (pageNum <= 0) pageNum = i + 1;
+              
+              if (pageNum > totalPages || pageNum <= 0) return null;
+
+              return (
+                <button 
+                  key={pageNum}
+                  className={`btn ${currentPage === pageNum ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => goToPage(pageNum)}
+                  style={{ minWidth: '40px', padding: '0.5rem' }}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+
+          <button 
+            className="btn btn-outline" 
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => goToPage(currentPage + 1)}
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            Próximo
+          </button>
+        </div>
       </div>
 
       {/* MODAL DE DETALHES COMPLETO */}
@@ -435,7 +526,11 @@ export default function LeadsPage() {
                     <p style={{ fontWeight: 500 }}>{viewingLead.email}</p>
                   </div>
                   <div>
-                    <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Telefone / WhatsApp</p>
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Celular / WhatsApp</p>
+                    <p style={{ fontWeight: 500 }}>{viewingLead.celular || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Telefone Fixo</p>
                     <p style={{ fontWeight: 500 }}>{viewingLead.telefone || 'Não informado'}</p>
                   </div>
                   <div>
@@ -521,24 +616,31 @@ export default function LeadsPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Telefone</label>
+                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Celular (WhatsApp)</label>
+                  <input 
+                    type="text" className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem' }} 
+                    value={formData.celular} onChange={e => setFormData({...formData, celular: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Telefone Fixo</label>
                   <input 
                     type="text" className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem' }} 
                     value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Status</label>
-                  <select 
-                    className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem' }} 
-                    value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as LeadStatus})}
-                  >
-                    <option value="novo">Novo</option>
-                    <option value="contatado">Contatado</option>
-                    <option value="convertido">Convertido</option>
-                    <option value="perdido">Perdido</option>
-                  </select>
-                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Status</label>
+                <select 
+                  className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem' }} 
+                  value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as LeadStatus})}
+                >
+                  <option value="novo">Novo</option>
+                  <option value="contatado">Contatado</option>
+                  <option value="convertido">Convertido</option>
+                  <option value="perdido">Perdido</option>
+                </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Empresa</label>
