@@ -211,30 +211,39 @@ export default function LeadsPage() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const lines = text.split('\n');
+      const lines = text.split(/\r?\n/);
+      if (lines.length < 2) return;
+
+      const headerLine = lines[0];
+      const separator = headerLine.includes(';') ? ';' : ',';
+      
+      const headers = headerLine.split(separator).map(h => h.trim().toLowerCase());
+      const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
+      const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
+      const idxTelefone = headers.findIndex(h => h.includes('telefone') || h.includes('celular') || h.includes('phone') || h.includes('mobile'));
+      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company'));
+      const idxCidade = headers.findIndex(h => h.includes('cidade') || h.includes('city'));
+      const idxEstado = headers.findIndex(h => h.includes('estado') || h.includes('state') || h.includes('uf'));
+
       let count = 0;
       
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (i === 0 || !line.trim()) continue;
+        if (!line.trim()) continue;
         
-        // Suporte a vírgula ou ponto-e-vírgula (comum em CSVs brasileiros)
-        const separator = line.includes(';') ? ';' : ',';
-        const parts = line.split(separator).map(p => p.replace(/"/g, '').trim());
+        const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
         
-        if (parts.length < 2) continue;
+        const email = idxEmail !== -1 ? cols[idxEmail] : '';
+        const nome = idxNome !== -1 ? cols[idxNome] : 'Importado';
+        const telefone = idxTelefone !== -1 ? cols[idxTelefone] : '';
+        const empresa = idxEmpresa !== -1 ? cols[idxEmpresa] : '';
+        const cidade = idxCidade !== -1 ? cols[idxCidade] : '';
+        const estado = idxEstado !== -1 ? cols[idxEstado] : '';
 
-        const email = parts[0]; // Coluna A
-        const nome = parts[1];  // Coluna B
-        const telefone = parts[2] || parts[3] || ''; // Coluna C (Telefone) ou D (Celular)
-        const empresa = parts[5] || ''; // Coluna F
-        const estado = parts[7] || '';  // Coluna H
-        const cidade = parts[8] || '';  // Coluna I
-        
         if (email && email.includes('@')) {
           await api.saveLead({
             id: Math.random().toString(36).substr(2, 9),
-            nome: nome || 'Importado',
+            nome: nome || 'Sem Nome',
             email: email,
             telefone: telefone,
             empresa: empresa,
@@ -341,6 +350,8 @@ export default function LeadsPage() {
               </th>
               <th>Nome</th>
               <th>E-mail</th>
+              <th>Telefone</th>
+              <th>Empresa</th>
               <th>Origem</th>
               <th>Data</th>
               <th>Status</th>
@@ -356,6 +367,8 @@ export default function LeadsPage() {
                 </td>
                 <td style={{ fontWeight: 500 }}>{lead.nome}</td>
                 <td style={{ opacity: 0.8 }}>{lead.email}</td>
+                <td>{lead.telefone || '-'}</td>
+                <td>{lead.empresa || '-'}</td>
                 <td>{lead.origem}</td>
                 <td>{new Date(lead.dataCriacao).toLocaleDateString('pt-BR')}</td>
                 <td>
