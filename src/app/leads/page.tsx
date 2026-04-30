@@ -215,13 +215,18 @@ export default function LeadsPage() {
       if (lines.length < 2) return;
 
       const headerLine = lines[0];
-      const separator = headerLine.includes(';') ? ';' : ',';
+      // Detectar o separador mais provável: Ponto-e-vírgula, Tabulação ou Vírgula
+      let separator = ',';
+      if (headerLine.includes(';')) separator = ';';
+      else if (headerLine.includes('\t')) separator = '\t';
       
       const headers = headerLine.split(separator).map(h => h.trim().toLowerCase());
+      
+      // Encontrar índices únicos para cada campo
       const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
       const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
       const idxTelefone = headers.findIndex(h => h.includes('telefone') || h.includes('celular') || h.includes('phone') || h.includes('mobile'));
-      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company'));
+      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company') || h.includes('cargo'));
       const idxCidade = headers.findIndex(h => h.includes('cidade') || h.includes('city'));
       const idxEstado = headers.findIndex(h => h.includes('estado') || h.includes('state') || h.includes('uf'));
 
@@ -233,14 +238,15 @@ export default function LeadsPage() {
         
         const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
         
-        const email = idxEmail !== -1 ? cols[idxEmail] : '';
-        const nome = idxNome !== -1 ? cols[idxNome] : 'Importado';
-        const telefone = idxTelefone !== -1 ? cols[idxTelefone] : '';
-        const empresa = idxEmpresa !== -1 ? cols[idxEmpresa] : '';
-        const cidade = idxCidade !== -1 ? cols[idxCidade] : '';
-        const estado = idxEstado !== -1 ? cols[idxEstado] : '';
+        // Garantir que não pegamos o mesmo índice para campos diferentes se o split falhar
+        const email = (idxEmail !== -1 && cols[idxEmail]) ? cols[idxEmail] : '';
+        const nome = (idxNome !== -1 && idxNome !== idxEmail && cols[idxNome]) ? cols[idxNome] : (email ? 'Sem Nome' : '');
+        const telefone = (idxTelefone !== -1 && idxTelefone !== idxEmail && cols[idxTelefone]) ? cols[idxTelefone] : '';
+        const empresa = (idxEmpresa !== -1 && idxEmpresa !== idxEmail && cols[idxEmpresa]) ? cols[idxEmpresa] : '';
+        const cidade = (idxCidade !== -1 && cols[idxCidade]) ? cols[idxCidade] : '';
+        const estado = (idxEstado !== -1 && cols[idxEstado]) ? cols[idxEstado] : '';
 
-        if (email && email.includes('@')) {
+        if (email && email.includes('@') && email.length < 100) {
           await api.saveLead({
             id: Math.random().toString(36).substr(2, 9),
             nome: nome || 'Sem Nome',

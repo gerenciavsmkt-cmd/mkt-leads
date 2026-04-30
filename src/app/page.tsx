@@ -54,16 +54,18 @@ export default function Dashboard() {
       const lines = text.split(/\r?\n/);
       if (lines.length < 2) return;
 
-      // Identificar o separador (vírgula ou ponto e vírgula)
       const headerLine = lines[0];
-      const separator = headerLine.includes(';') ? ';' : ',';
+      // Detectar o separador mais provável: Ponto-e-vírgula, Tabulação ou Vírgula
+      let separator = ',';
+      if (headerLine.includes(';')) separator = ';';
+      else if (headerLine.includes('\t')) separator = '\t';
       
       // Mapear índices das colunas baseado no cabeçalho
       const headers = headerLine.split(separator).map(h => h.trim().toLowerCase());
       const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
       const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
       const idxTelefone = headers.findIndex(h => h.includes('telefone') || h.includes('celular') || h.includes('phone') || h.includes('mobile'));
-      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company'));
+      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company') || h.includes('cargo'));
 
       let count = 0;
       
@@ -73,12 +75,12 @@ export default function Dashboard() {
         // Split simples mas respeitando o separador detectado
         const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
         
-        const email = idxEmail !== -1 ? cols[idxEmail] : '';
-        const nome = idxNome !== -1 ? cols[idxNome] : 'Importado';
-        const telefone = idxTelefone !== -1 ? cols[idxTelefone] : '';
-        const empresa = idxEmpresa !== -1 ? cols[idxEmpresa] : '';
+        const email = (idxEmail !== -1 && cols[idxEmail]) ? cols[idxEmail] : '';
+        const nome = (idxNome !== -1 && idxNome !== idxEmail && cols[idxNome]) ? cols[idxNome] : (email ? 'Sem Nome' : '');
+        const telefone = (idxTelefone !== -1 && idxTelefone !== idxEmail && cols[idxTelefone]) ? cols[idxTelefone] : '';
+        const empresa = (idxEmpresa !== -1 && idxEmpresa !== idxEmail && cols[idxEmpresa]) ? cols[idxEmpresa] : '';
 
-        if (email && email.includes('@')) {
+        if (email && email.includes('@') && email.length < 100) {
           api.saveLead({
             id: Math.random().toString(36).substr(2, 9),
             nome: nome || 'Sem Nome',
