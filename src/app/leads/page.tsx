@@ -211,28 +211,6 @@ export default function LeadsPage() {
     document.body.removeChild(link);
   };
 
-  const handleFixLegacyLeads = async () => {
-    setImportStatus('Corrigindo banco de dados...');
-    let fixedCount = 0;
-    
-    for (const lead of leads) {
-      if (lead.telefone && !lead.celular) {
-        await api.saveLead({
-          ...lead,
-          celular: lead.telefone,
-          telefone: '' // Opcional: limpa o fixo se você tiver certeza que era celular
-        });
-        fixedCount++;
-      }
-    }
-    
-    setImportStatus(`${fixedCount} leads corrigidos!`);
-    setTimeout(() => {
-      setImportStatus('');
-      refreshLeads();
-    }, 2000);
-  };
-
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -356,14 +334,11 @@ export default function LeadsPage() {
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn btn-outline" onClick={handleExportLeads}>
-            <Download size={18} /> Exportar Backup
-          </button>
-          <button className="btn btn-outline" style={{ color: 'var(--warning)', borderColor: 'var(--warning)' }} onClick={handleFixLegacyLeads}>
-            <Info size={18} /> Corrigir Contatos Antigos
-          </button>
-          <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
-            <Upload size={18} /> Importar Planilha
-          </button>
+              <Download size={18} /> Exportar Backup
+            </button>
+            <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
+              <Upload size={18} /> Importar Planilha
+            </button>
             <button className="btn btn-primary" onClick={() => openModal()}>
               <UserPlus size={18} /> Novo Lead
             </button>
