@@ -51,22 +51,44 @@ export default function Dashboard() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const lines = text.split('\n');
+      const lines = text.split(/\r?\n/);
+      if (lines.length < 2) return;
+
+      // Identificar o separador (vírgula ou ponto e vírgula)
+      const headerLine = lines[0];
+      const separator = headerLine.includes(';') ? ';' : ',';
+      
+      // Mapear índices das colunas baseado no cabeçalho
+      const headers = headerLine.split(separator).map(h => h.trim().toLowerCase());
+      const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
+      const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
+      const idxTelefone = headers.findIndex(h => h.includes('telefone') || h.includes('celular') || h.includes('phone') || h.includes('mobile'));
+      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company'));
+
       let count = 0;
       
       lines.forEach((line, i) => {
-        if (i === 0 || !line.trim()) return; // Skip header/empty
-        const [nome, email, telefone] = line.split(',');
+        if (i === 0 || !line.trim()) return;
+        
+        // Split simples mas respeitando o separador detectado
+        const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
+        
+        const email = idxEmail !== -1 ? cols[idxEmail] : '';
+        const nome = idxNome !== -1 ? cols[idxNome] : 'Importado';
+        const telefone = idxTelefone !== -1 ? cols[idxTelefone] : '';
+        const empresa = idxEmpresa !== -1 ? cols[idxEmpresa] : '';
+
         if (email && email.includes('@')) {
           api.saveLead({
             id: Math.random().toString(36).substr(2, 9),
-            nome: nome?.trim() || 'Importado',
-            email: email.trim(),
-            telefone: telefone?.trim(),
-            origem: 'Importação CSV',
+            nome: nome || 'Sem Nome',
+            email: email,
+            telefone: telefone,
+            empresa: empresa,
+            origem: 'Planilha RD/Massa',
             dataCriacao: new Date().toISOString(),
             status: 'novo',
-            tags: ['csv-import'],
+            tags: ['importado-planilha'],
             consentimentoLGPD: true
           });
           count++;
@@ -77,7 +99,7 @@ export default function Dashboard() {
       setTimeout(() => {
         setIsImportModalOpen(false);
         setImportStatus('');
-        window.location.reload(); // Refresh to show new leads
+        window.location.reload();
       }, 2000);
     };
     reader.readAsText(file);
