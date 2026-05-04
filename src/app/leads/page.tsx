@@ -604,6 +604,14 @@ export default function LeadsPage() {
           <button 
             className="btn btn-outline" 
             disabled={currentPage === 1}
+            onClick={() => goToPage(1)}
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            Primeira
+          </button>
+          <button 
+            className="btn btn-outline" 
+            disabled={currentPage === 1}
             onClick={() => goToPage(currentPage - 1)}
             style={{ padding: '0.5rem 1rem' }}
           >
@@ -638,6 +646,14 @@ export default function LeadsPage() {
             style={{ padding: '0.5rem 1rem' }}
           >
             Próximo
+          </button>
+          <button 
+            className="btn btn-outline" 
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => goToPage(totalPages)}
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            Última
           </button>
         </div>
       </div>
