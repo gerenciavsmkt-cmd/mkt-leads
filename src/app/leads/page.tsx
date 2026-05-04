@@ -15,11 +15,7 @@ import {
   Info,
   Download,
   Upload,
-  Check,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight
+  Check
 } from 'lucide-react';
 
 export default function LeadsPage() {

@@ -82,11 +82,7 @@ export const api = {
     querySnapshot.forEach((doc) => {
       leads.push({ id: doc.id, ...doc.data() } as Lead);
     });
-    return leads.sort((a, b) => {
-      const dateA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
-      const dateB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
-      return dateB - dateA;
-    });
+    return leads.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
   },
   
   saveLead: async (lead: Lead) => {
