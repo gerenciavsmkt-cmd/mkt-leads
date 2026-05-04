@@ -609,19 +609,17 @@ export default function LeadsPage() {
             className="btn btn-outline" 
             disabled={currentPage === 1}
             onClick={() => goToPage(1)}
-            style={{ padding: '0.5rem', minWidth: '40px' }}
-            title="Primeira Página"
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
           >
-            <ChevronsLeft size={18} />
+            Primeira
           </button>
           <button 
             className="btn btn-outline" 
             disabled={currentPage === 1}
             onClick={() => goToPage(currentPage - 1)}
-            style={{ padding: '0.5rem', minWidth: '40px' }}
-            title="Página Anterior"
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
           >
-            <ChevronLeft size={18} />
+            Anterior
           </button>
           
           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
@@ -637,7 +635,7 @@ export default function LeadsPage() {
                   key={pageNum}
                   className={`btn ${currentPage === pageNum ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => goToPage(pageNum)}
-                  style={{ minWidth: '40px', padding: '0.5rem' }}
+                  style={{ minWidth: '36px', padding: '0.5rem' }}
                 >
                   {pageNum}
                 </button>
@@ -649,19 +647,17 @@ export default function LeadsPage() {
             className="btn btn-outline" 
             disabled={currentPage === totalPages || totalPages === 0}
             onClick={() => goToPage(currentPage + 1)}
-            style={{ padding: '0.5rem', minWidth: '40px' }}
-            title="Próxima Página"
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
           >
-            <ChevronRight size={18} />
+            Próximo
           </button>
           <button 
             className="btn btn-outline" 
             disabled={currentPage === totalPages || totalPages === 0}
             onClick={() => goToPage(totalPages)}
-            style={{ padding: '0.5rem', minWidth: '40px' }}
-            title="Última Página"
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
           >
-            <ChevronsRight size={18} />
+            Última
           </button>
         </div>
       </div>

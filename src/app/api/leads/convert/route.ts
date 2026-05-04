@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, arrayUnion, getDoc, setDoc } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,8 +86,7 @@ export async function POST(request: Request) {
         observacoes: `[CONVERSÃO DIRETA] Cadastro automático via venda.${valor ? ` Valor: R$ ${valor}.` : ''}${pedidoId ? ` Pedido: ${pedidoId}.` : ''}`
       };
 
-      const { setDoc, doc: firestoreDoc } = await import('firebase/firestore');
-      await setDoc(firestoreDoc(db, 'leads', leadId), newLead);
+      await setDoc(doc(db, 'leads', leadId), newLead);
 
       return NextResponse.json({ success: true, message: 'Novo lead criado e convertido.', leadId });
     }
