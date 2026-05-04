@@ -348,12 +348,19 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '2rem', [config.posicao || 'right']: '2rem', zIndex: 9999, pointerEvents: 'none' }}>
-       <button onClick={() => setOpen(!open)} style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#25D366', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', border: 'none', cursor: 'pointer', position: 'relative', zIndex: 10000, pointerEvents: 'auto' }}>
-         {open ? <X size={32} /> : renderBioSocialIcon('whatsapp', 32, 'white')}
-       </button>
+    <div style={{ 
+      position: 'fixed', 
+      bottom: '2rem', 
+      [config.posicao || 'right']: '2rem', 
+      zIndex: 9999,
+      pointerEvents: 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: config.posicao === 'left' ? 'flex-start' : 'flex-end',
+      justifyContent: 'flex-end'
+    }}>
        {open && (
-         <div style={{ position: 'absolute', bottom: '80px', [config.posicao || 'right']: 0, width: '350px', background: 'white', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', overflow: 'hidden', color: '#1e293b', pointerEvents: 'auto' }}>
+         <div style={{ width: '350px', background: 'white', borderRadius: '16px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', overflow: 'hidden', color: '#1e293b', pointerEvents: 'auto', marginBottom: '1rem' }}>
             <div style={{ background: '#25D366', padding: '1.5rem', color: 'white' }}><h3 style={{ fontWeight: 700 }}>Iniciar Conversa</h3><p style={{ fontSize: '0.85rem' }}>Escolha um atendente para falar agora.</p></div>
             <div style={{ padding: '1rem' }}>
                {!showForm ? config.atendentes.map((at: any) => (
@@ -379,6 +386,9 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
             </div>
          </div>
        )}
+       <button onClick={() => setOpen(!open)} style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#25D366', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', border: 'none', cursor: 'pointer', position: 'relative', zIndex: 10000, pointerEvents: 'auto' }}>
+         {open ? <X size={32} /> : renderBioSocialIcon('whatsapp', 32, 'white')}
+       </button>
     </div>
   );
 }
