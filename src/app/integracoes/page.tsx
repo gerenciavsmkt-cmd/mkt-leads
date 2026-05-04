@@ -177,6 +177,7 @@ export default function IntegracoesPage() {
 {`{
   "email": "cliente@email.com",
   "nome": "Nome do Cliente",
+  "telefone": "48999999999",
   "valor": "199.90",
   "pedidoId": "12345"
 }`}
