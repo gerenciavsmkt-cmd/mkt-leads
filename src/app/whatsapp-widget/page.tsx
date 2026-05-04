@@ -27,6 +27,13 @@ export default function WhatsappWidgetStandalone() {
     load();
   }, []);
 
+  useEffect(() => {
+    // Notificar o pai sobre o estado (aberto/fechado) para redimensionar o iframe se necessário
+    if (typeof window !== 'undefined' && window.parent) {
+      window.parent.postMessage({ type: 'wa-widget-state', open }, '*');
+    }
+  }, [open]);
+
   if (!settings?.whatsappWidget?.enabled || !settings.whatsappWidget.atendentes.length) {
     return null;
   }
@@ -64,11 +71,11 @@ export default function WhatsappWidgetStandalone() {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '1rem', [config.posicao || 'right']: '1rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ position: 'fixed', bottom: '1rem', [config.posicao || 'right']: '1rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif', pointerEvents: 'none' }}>
        {/* Botão Flutuante */}
        <button 
          onClick={() => setOpen(!open)}
-         style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#25D366', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer', transition: 'transform 0.2s', position: 'relative', zIndex: 10000 }}
+         style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#25D366', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(0,0,0,0.25)', border: 'none', cursor: 'pointer', transition: 'transform 0.2s', position: 'relative', zIndex: 10000, pointerEvents: 'auto' }}
          onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
          onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
        >
@@ -77,7 +84,7 @@ export default function WhatsappWidgetStandalone() {
 
        {/* Janela Pop-up */}
        {open && (
-         <div style={{ position: 'absolute', bottom: '75px', [config.posicao || 'right']: 0, width: '320px', background: 'white', borderRadius: '16px', boxShadow: '0 15px 40px rgba(0,0,0,0.2)', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' }}>
+         <div style={{ position: 'absolute', bottom: '75px', [config.posicao || 'right']: 0, width: '320px', background: 'white', borderRadius: '16px', boxShadow: '0 15px 40px rgba(0,0,0,0.2)', overflow: 'hidden', animation: 'slideUp 0.3s ease-out', pointerEvents: 'auto' }}>
             <div style={{ background: '#25D366', padding: '1.25rem', color: 'white' }}>
                <h3 style={{ fontWeight: 700, fontSize: '1rem', margin: 0 }}>Fale Conosco</h3>
                <p style={{ fontSize: '0.8rem', opacity: 0.9, margin: '4px 0 0 0' }}>Escolha um atendente abaixo:</p>
