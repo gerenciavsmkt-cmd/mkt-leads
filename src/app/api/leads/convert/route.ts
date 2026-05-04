@@ -11,16 +11,39 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log('Dados recebidos no webhook:', JSON.stringify(body));
     
-    // Normalização de campos para aceitar diferentes padrões (português/inglês)
-    const email = body.email || body.email_address || '';
-    const telefone = String(body.telefone || body.phone || body.celular || body.mobile || '').replace(/\D/g, '');
-    const nome = body.nome || body.name || body.full_name || '';
-    const valor = body.valor || body.total || body.amount || '';
-    const pedidoId = body.pedidoId || body.order_id || body.id || '';
+    // Função auxiliar para buscar campo em objetos aninhados (comum em WooCommerce/Zapier)
+    const getField = (obj: any, keys: string[]): string => {
+      for (const key of keys) {
+        if (obj[key] && typeof obj[key] !== 'object') return String(obj[key]);
+      }
+      // Busca em objetos aninhados comuns
+      const subObjs = ['billing', 'customer', 'data', 'shipping', 'user'];
+      for (const sub of subObjs) {
+        if (obj[sub] && typeof obj[sub] === 'object') {
+          for (const key of keys) {
+            if (obj[sub][key] && typeof obj[sub][key] !== 'object') return String(obj[sub][key]);
+          }
+        }
+      }
+      return '';
+    };
+
+    const email = getField(body, ['email', 'email_address', 'user_email', 'billing_email']);
+    const rawTelefone = getField(body, ['telefone', 'phone', 'celular', 'mobile', 'billing_phone', 'phone_number']);
+    const telefone = rawTelefone.replace(/\D/g, '');
+    
+    // Tenta extrair nome completo ou primeiro/último nome
+    let nome = getField(body, ['nome', 'name', 'full_name', 'billing_first_name', 'first_name']);
+    const sobrenome = getField(body, ['sobrenome', 'last_name', 'billing_last_name']);
+    if (nome && sobrenome && !nome.includes(sobrenome)) nome += ' ' + sobrenome;
+
+    const valor = getField(body, ['valor', 'total', 'amount', 'order_total']);
+    const pedidoId = getField(body, ['pedidoId', 'order_id', 'id', 'number', 'order_number']);
 
     if (!email && !telefone) {
-      return NextResponse.json({ error: 'É necessário informar email ou telefone para identificar o lead.' }, { status: 400 });
+      return NextResponse.json({ error: 'Identificador (email ou telefone) não encontrado no payload.' }, { status: 400 });
     }
 
     const leadsRef = collection(db, 'leads');
@@ -42,11 +65,11 @@ export async function POST(request: Request) {
         if (!snap2.empty) {
           const leadDoc = snap2.docs[0];
           await updateLead(leadDoc.id, nome, telefone, valor, pedidoId);
-          return NextResponse.json({ success: true, message: 'Lead convertido com sucesso (via telefone fixo).' });
+          return NextResponse.json({ success: true, message: 'Lead atualizado via telefone fixo.' });
         }
       }
 
-      // NOVO: Se não encontrou de jeito nenhum, cria um novo lead como convertido
+      // Criar novo lead como convertido
       const leadId = Math.random().toString(36).substr(2, 9);
       const newLead = {
         id: leadId,
@@ -58,32 +81,24 @@ export async function POST(request: Request) {
         origem: 'Conversão Direta (Site)',
         dataCriacao: new Date().toISOString(),
         consentimentoLGPD: true,
-        observacoes: `[CONVERSÃO DIRETA] Lead criado automaticamente a partir de uma compra no site.${valor ? ` Valor: R$ ${valor}.` : ''}${pedidoId ? ` Pedido: ${pedidoId}.` : ''}`
+        observacoes: `[CONVERSÃO DIRETA] Cadastro automático via venda.${valor ? ` Valor: R$ ${valor}.` : ''}${pedidoId ? ` Pedido: ${pedidoId}.` : ''}`
       };
 
       const { setDoc, doc: firestoreDoc } = await import('firebase/firestore');
       await setDoc(firestoreDoc(db, 'leads', leadId), newLead);
 
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Novo lead criado e convertido com sucesso.',
-        leadId: leadId
-      });
+      return NextResponse.json({ success: true, message: 'Novo lead criado e convertido.', leadId });
     }
 
     // Atualizar o primeiro lead encontrado
     const leadDoc = querySnapshot.docs[0];
     await updateLead(leadDoc.id, nome, telefone, valor, pedidoId);
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Lead convertido com sucesso.',
-      leadId: leadDoc.id
-    });
+    return NextResponse.json({ success: true, message: 'Lead existente convertido.', leadId: leadDoc.id });
 
   } catch (error: any) {
-    console.error('Erro na conversão de lead:', error);
-    return NextResponse.json({ error: 'Erro interno no servidor' }, { status: 500 });
+    console.error('Erro na conversão:', error);
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
 
@@ -103,13 +118,12 @@ async function updateLead(leadId: string, nome?: string, celular?: string, valor
     observacoes: (data?.observacoes || '') + novaObs
   };
 
-  // Atualiza o nome se o atual for genérico ou estiver vazio
-  if (nome && (!data?.nome || data.nome === 'Cliente do Site' || data.nome === 'Sem Nome')) {
+  // Só atualiza se o dado recebido for válido e o atual for genérico
+  if (nome && (!data?.nome || data.nome === 'Cliente do Site' || data.nome === 'Sem Nome' || data.nome === 'Sem nome')) {
     updateData.nome = nome;
   }
   
-  // Atualiza o celular se estiver vazio no cadastro
-  if (celular && !data?.celular) {
+  if (celular && (!data?.celular || data.celular === '-')) {
     updateData.celular = celular;
   }
   
