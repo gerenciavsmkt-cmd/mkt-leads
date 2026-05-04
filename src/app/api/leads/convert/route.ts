@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, arrayUnion, getDoc } from 'firebase/firestore';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,12 +64,17 @@ export async function POST(request: Request) {
 
 async function updateLead(leadId: string, currentTags: string[], valor?: string, pedidoId?: string) {
   const leadRef = doc(db, 'leads', leadId);
+  const snap = await getDoc(leadRef);
+  const data = snap.data();
+  
   const newTags = ['compra-realizada'];
   if (valor) newTags.push(`valor-${valor}`);
+  
+  const novaObs = `\n[CONVERSÃO] Compra realizada${pedidoId ? ` (Pedido: ${pedidoId})` : ''}${valor ? ` no valor de R$ ${valor}` : ''} em ${new Date().toLocaleString('pt-BR')}`;
   
   await updateDoc(leadRef, {
     status: 'convertido',
     tags: arrayUnion(...newTags),
-    observacoes: arrayUnion(`\n[CONVERSÃO] Compra realizada${pedidoId ? ` (Pedido: ${pedidoId})` : ''}${valor ? ` no valor de R$ ${valor}` : ''} em ${new Date().toLocaleString('pt-BR')}`)
+    observacoes: (data?.observacoes || '') + novaObs
   });
 }
