@@ -71,7 +71,7 @@ export default function WhatsappWidgetStandalone() {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '1rem', [config.posicao || 'right']: '1rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif', pointerEvents: 'none' }}>
+    <div id="widget-container" style={{ position: 'fixed', bottom: '1rem', [config.posicao || 'right']: '1rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif', pointerEvents: 'none' }}>
        {/* Botão Flutuante */}
        <button 
          onClick={() => setOpen(!open)}
@@ -156,7 +156,19 @@ export default function WhatsappWidgetStandalone() {
 
        <style>{`
          @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-         body { background: transparent !important; margin: 0; padding: 0; overflow: hidden; }
+         html, body { 
+           background: transparent !important; 
+           background-color: transparent !important;
+           margin: 0; 
+           padding: 0; 
+           overflow: hidden;
+           width: 100%;
+           height: 100%;
+           pointer-events: none;
+         }
+         #widget-container {
+           pointer-events: auto;
+         }
        `}</style>
     </div>
   );
