@@ -280,8 +280,8 @@ function RenderBioLink({ bio }: { bio: BioLink }) {
 }
 
 // --- LANDING PAGE COMPONENTS ---
-function CaptureForm({ config, onSubmit }: { config: any, onSubmit: any }) {
-  const [formData, setFormData] = useState({ nome: '', email: '', telefone: '', empresa: '', captchaInput: '', consentimento: false });
+function CaptureForm({ config, templateId, onSubmit }: { config: any, templateId?: string, onSubmit: any }) {
+  const [formData, setFormData] = useState({ nome: '', email: '', telefone: '', empresa: '', captchaInput: '', consentimento: false, catalogType: 'compacto' });
   const [captcha, setCaptcha] = useState({ a: 0, b: 0, sum: 0 });
 
   useEffect(() => {
@@ -311,21 +311,64 @@ function CaptureForm({ config, onSubmit }: { config: any, onSubmit: any }) {
   const inputBg = isLightBackground ? '#f8fafc' : 'white';
 
   return (
-    <div className="lp-form-container" style={{ background: config.formColor || '#4285F4', color: textColor }}>
-      <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+    <div className="lp-form-container" style={{ background: config.formColor || '#4285F4', color: textColor, padding: '2rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
         <h2 style={{ fontSize: '1.85rem', fontWeight: 700, marginBottom: '0.4rem', color: textColor }}>{config.formTitulo}</h2>
-        <p style={{ fontSize: '0.95rem', opacity: 0.9, color: textColor }}>{config.formSubtitulo}</p>
+        <p style={{ fontSize: '0.9rem', opacity: 0.9, color: textColor }}>{config.formSubtitulo}</p>
       </div>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
-        <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Nome*</label><input required style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} /></div>
-        <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Email*</label><input required type="email" style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-        <div className="form-grid-2">
-          <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Celular*</label><input required style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} placeholder="(00) 00000-0000" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} /></div>
-          <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Empresa</label><input style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.empresa} onChange={e => setFormData({...formData, empresa: e.target.value})} /></div>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.85rem' }}>
+        <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Nome*</label><input required style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} /></div>
+        <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Email*</label><input required type="email" style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+        <div className="form-grid-2" style={{ gap: '0.85rem' }}>
+          <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Celular*</label><input required style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} placeholder="(00) 00000-0000" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} /></div>
+          <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Empresa</label><input style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.empresa} onChange={e => setFormData({...formData, empresa: e.target.value})} /></div>
         </div>
-        <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Quanto é {captcha.a} + {captcha.b}?</label><input required style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} placeholder="Resultado da soma" value={formData.captchaInput} onChange={e => setFormData({...formData, captchaInput: e.target.value})} /></div>
-        <label style={{ display: 'flex', gap: '0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: textColor }}><input type="checkbox" style={{ width: '18px', height: '18px' }} checked={formData.consentimento} onChange={e => setFormData({...formData, consentimento: e.target.checked})} /><span>Eu concordo em receber comunicações de marketing conforme a LGPD.</span></label>
-        <button type="submit" style={{ height: '60px', borderRadius: '12px', background: config.botaoColor || '#fbbf24', color: btnTextColor, fontWeight: 700, fontSize: '1.2rem', width: '100%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>{config.botaoTexto || 'Falar com um consultor'} <ChevronRight size={22} /></button>
+        <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Quanto é {captcha.a} + {captcha.b}?</label><input required style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} placeholder="Resultado da soma" value={formData.captchaInput} onChange={e => setFormData({...formData, captchaInput: e.target.value})} /></div>
+
+        {templateId === 'lead-magnet' && (
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.5rem' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', display: 'block', opacity: 0.8 }}>Qual catálogo deseja receber?</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div 
+                onClick={() => setFormData({...formData, catalogType: 'compacto'})}
+                style={{ 
+                  padding: '0.75rem', 
+                  borderRadius: '8px', 
+                  border: formData.catalogType === 'compacto' ? `2px solid ${config.botaoColor || '#fbbf24'}` : '1px solid rgba(255,255,255,0.2)',
+                  background: formData.catalogType === 'compacto' ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Catálogo Compacto</div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Visualizar em PDF</div>
+              </div>
+              <div 
+                onClick={() => setFormData({...formData, catalogType: 'completo'})}
+                style={{ 
+                  padding: '0.5rem', 
+                  borderRadius: '8px', 
+                  border: formData.catalogType === 'completo' ? `2px solid ${config.botaoColor || '#fbbf24'}` : '1px solid rgba(255,255,255,0.2)',
+                  background: formData.catalogType === 'completo' ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Catálogo Completo</div>
+                <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Acesso Online</div>
+              </div>
+            </div>
+          </div>
+        )}
+        <label style={{ display: 'flex', gap: '0.5rem', cursor: 'pointer', fontSize: '0.75rem', color: textColor }}><input type="checkbox" style={{ width: '16px', height: '16px' }} checked={formData.consentimento} onChange={e => setFormData({...formData, consentimento: e.target.checked})} /><span>Concordo com as comunicações de marketing (LGPD).</span></label>
+        <button type="submit" style={{ height: '52px', borderRadius: '12px', background: config.botaoColor || '#fbbf24', color: btnTextColor, fontWeight: 700, fontSize: '1.1rem', width: '100%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+          {templateId === 'lead-magnet' 
+            ? (formData.catalogType === 'compacto' ? 'Baixar catálogo agora' : 'Acessar catálogo') 
+            : (config.botaoTexto || 'Falar com um consultor')} 
+          <ChevronRight size={20} />
+        </button>
       </form>
     </div>
   );
@@ -413,9 +456,27 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     setTimeout(() => setCopying(false), 2000);
   };
 
-  const handleFinalAction = () => {
+  const handleFinalAction = (catalogType?: string) => {
     const actionType = config.formActionType;
     const actionUrl = config.formActionUrl || config.downloadFileUrl;
+
+    // Lógica inteligente para o Catálogo (Lead Magnet)
+    if (page.templateId === 'lead-magnet' && catalogType) {
+      if (catalogType === 'compacto' && config.downloadFileUrl) {
+        const link = document.createElement('a');
+        link.href = config.downloadFileUrl;
+        link.download = '';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setSubmitted(true);
+        return;
+      } else if (catalogType === 'completo' && config.formActionUrl) {
+        window.location.href = config.formActionUrl;
+        return;
+      }
+    }
 
     if (actionType === 'redirect' && actionUrl) {
       window.location.href = actionUrl;
@@ -439,7 +500,8 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
   const handleFormSubmit = async (formData: any) => {
     const newLead: Lead = {
       id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, telefone: formData.telefone, empresa: formData.empresa,
-      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined
+      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined,
+      observacoes: formData.catalogType ? `[ESCOLHA] Interessado no catálogo ${formData.catalogType}.` : ''
     };
     await api.saveLead(newLead);
 
@@ -473,7 +535,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       return;
     }
 
-    handleFinalAction();
+    handleFinalAction(formData.catalogType);
   };
 
   const CouponModal = () => (
@@ -555,7 +617,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
           </div>
 
           <div id="vsl-form" style={{ maxWidth: '500px', margin: '0 auto' }}>
-            <CaptureForm config={config} onSubmit={handleFormSubmit} />
+            <CaptureForm config={config} templateId={page.templateId} onSubmit={handleFormSubmit} />
           </div>
         </div>
         <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
@@ -577,7 +639,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
               <div key={i} className="lp-benefit-item"><Check size={20} color="#10b981" /> {b}</div>
             ))}</div>
           </div>
-          <div><CaptureForm config={config} onSubmit={handleFormSubmit} /></div>
+          <div><CaptureForm config={config} templateId={page.templateId} onSubmit={handleFormSubmit} /></div>
         </div>
       </div>
       <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
