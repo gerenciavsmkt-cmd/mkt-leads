@@ -98,7 +98,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     botaoColor: '#2563eb',
     formColor: '#ffffff',
     formTitulo: 'Receber Material',
-    formSubtitulo: 'Informe seus dados para liberar o acesso ao PDF.',
+    formSubtitulo: 'Informe seus dados para liberar o acesso ao material.',
     formActionType: 'download',
     whatsapp: {
       enabled: true,

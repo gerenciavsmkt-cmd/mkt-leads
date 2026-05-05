@@ -292,7 +292,8 @@ function CaptureForm({ config, templateId, onSubmit }: { config: any, templateId
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (parseInt(formData.captchaInput) !== captcha.sum) { alert("Soma incorreta!"); return; }
+    const needsCaptcha = templateId !== 'lead-magnet' || formData.catalogType !== 'completo';
+    if (needsCaptcha && parseInt(formData.captchaInput) !== captcha.sum) { alert("Soma incorreta!"); return; }
     if (!formData.consentimento) { alert("Aceite os termos!"); return; }
     onSubmit(formData);
   };
@@ -321,9 +322,13 @@ function CaptureForm({ config, templateId, onSubmit }: { config: any, templateId
         <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Email*</label><input required type="email" style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
         <div className="form-grid-2" style={{ gap: '0.85rem' }}>
           <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Celular*</label><input required style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} placeholder="(00) 00000-0000" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} /></div>
-          <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Empresa</label><input style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.empresa} onChange={e => setFormData({...formData, empresa: e.target.value})} /></div>
+          {(templateId !== 'lead-magnet' || formData.catalogType !== 'completo') && (
+            <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Empresa</label><input style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} value={formData.empresa} onChange={e => setFormData({...formData, empresa: e.target.value})} /></div>
+          )}
         </div>
-        <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Quanto é {captcha.a} + {captcha.b}?</label><input required style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} placeholder="Resultado da soma" value={formData.captchaInput} onChange={e => setFormData({...formData, captchaInput: e.target.value})} /></div>
+        {(templateId !== 'lead-magnet' || formData.catalogType !== 'completo') && (
+          <div style={{ display: 'grid', gap: '0.3rem' }}><label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Quanto é {captcha.a} + {captcha.b}?</label><input required={templateId !== 'lead-magnet' || formData.catalogType !== 'completo'} style={{ width: '100%', height: '42px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1rem', fontSize: '0.95rem', background: inputBg, color: '#1e293b' }} placeholder="Resultado da soma" value={formData.captchaInput} onChange={e => setFormData({...formData, captchaInput: e.target.value})} /></div>
+        )}
 
         {templateId === 'lead-magnet' && (
           <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.5rem' }}>
@@ -491,9 +496,14 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
   };
 
   const handleFormSubmit = async (formData: any) => {
+    const tags: string[] = [page.slug];
+    if (page.templateId === 'lead-magnet' && formData.catalogType) {
+      tags.push(formData.catalogType === 'compacto' ? 'PDF' : 'online');
+    }
+
     const newLead: Lead = {
       id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, telefone: formData.telefone, empresa: formData.empresa,
-      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined,
+      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: tags, consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined,
       observacoes: formData.catalogType ? `[ESCOLHA] Interessado no catálogo ${formData.catalogType}.` : ''
     };
     await api.saveLead(newLead);
