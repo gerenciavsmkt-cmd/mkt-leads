@@ -310,7 +310,7 @@ function CaptureForm({ config, onSubmit }: { config: any, onSubmit: any }) {
   const inputBg = isLightBackground ? '#f8fafc' : 'white';
 
   return (
-    <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto', background: config.formColor || '#4285F4', borderRadius: '16px', padding: '3rem 2rem', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)', color: textColor }}>
+    <div className="lp-form-container" style={{ background: config.formColor || '#4285F4', color: textColor }}>
       <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '1.85rem', fontWeight: 700, marginBottom: '0.4rem', color: textColor }}>{config.formTitulo}</h2>
         <p style={{ fontSize: '0.95rem', opacity: 0.9, color: textColor }}>{config.formSubtitulo}</p>
@@ -318,7 +318,7 @@ function CaptureForm({ config, onSubmit }: { config: any, onSubmit: any }) {
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.25rem' }}>
         <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Nome*</label><input required style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} /></div>
         <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Email*</label><input required type="email" style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="form-grid-2">
           <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Celular*</label><input required style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} placeholder="(00) 00000-0000" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} /></div>
           <div style={{ display: 'grid', gap: '0.4rem' }}><label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Empresa</label><input style={{ width: '100%', height: '50px', borderRadius: '8px', border: isLightBackground ? '1px solid #cbd5e1' : 'none', padding: '0 1.25rem', fontSize: '1rem', background: inputBg, color: '#1e293b' }} value={formData.empresa} onChange={e => setFormData({...formData, empresa: e.target.value})} /></div>
         </div>
@@ -468,14 +468,14 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     <div style={{ minHeight: '100vh', position: 'relative', zIndex: 1, color: 'white' }}>
       <div style={{ position: 'fixed', inset: 0, background: currentBg ? `url("${currentBg}") center/cover no-repeat fixed` : 'none', zIndex: -2 }} />
       <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.85))', zIndex: -1 }} />
-      <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '4rem 2rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ marginBottom: '2rem' }}>{config.logoUrl && config.logoUrl !== 'none' ? <img src={config.logoUrl} style={{ maxHeight: '60px' }} /> : <h1>{config.titulo}</h1>}</div>
-            <h2 style={{ fontSize: '3.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>{config.subtitulo} <span style={{ color: config.botaoColor || '#fbbf24' }}>{config.destaque}</span></h2>
-            <p style={{ fontSize: '1.15rem', opacity: 0.9, marginBottom: '2rem' }}>{config.descricao}</p>
-            <div style={{ display: 'grid', gap: '1.25rem' }}>{config.beneficios?.map((b: string, i: number) => (
-              <div key={i} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}><Check size={20} color="#10b981" /> {b}</div>
+      <div className="lp-container">
+        <div className="lp-grid">
+          <div className="lp-content">
+            <div className="lp-header-logo">{config.logoUrl && config.logoUrl !== 'none' ? <img src={config.logoUrl} style={{ maxHeight: '60px' }} /> : <h1>{config.titulo}</h1>}</div>
+            <h2 className="lp-title">{config.subtitulo} <span style={{ color: config.botaoColor || '#fbbf24' }}>{config.destaque}</span></h2>
+            <p className="lp-description">{config.descricao}</p>
+            <div className="lp-benefits">{config.beneficios?.map((b: string, i: number) => (
+              <div key={i} className="lp-benefit-item"><Check size={20} color="#10b981" /> {b}</div>
             ))}</div>
           </div>
           <div><CaptureForm config={config} onSubmit={handleFormSubmit} /></div>
