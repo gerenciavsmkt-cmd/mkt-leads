@@ -2,9 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { api } from '@/services/api';
-import { Lead, LandingPageInstance, BioLink } from '@/types/crm';
-import { CheckCircle2, ChevronRight, Check, Calendar, MessageCircle, X, User, Smartphone, Globe, ShoppingCart, Share2, Link as LinkIcon, Star, ChevronLeft } from 'lucide-react';
+import { Lead, LandingPageInstance, BioLink, Settings } from '@/types/crm';
+import { CheckCircle2, ChevronRight, Check, Calendar, MessageCircle, X, User, Smartphone, Globe, ShoppingCart, Share2, Link as LinkIcon, Star, ChevronLeft, Copy, Mail } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { sendEmailBrevoAction } from '@/app/actions/brevo';
 
 // --- HELPERS ---
 const DEFAULT_BGS = {
@@ -396,7 +397,21 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
 function RenderLandingPage({ page }: { page: LandingPageInstance }) {
   const searchParams = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<Settings | null>(null);
+  const [copying, setCopying] = useState(false);
   const config = page?.config || {} as any;
+
+  useEffect(() => {
+    api.getSettings().then(setGlobalSettings);
+  }, []);
+
+  const handleCopyCoupon = () => {
+    if (!config.couponCode) return;
+    navigator.clipboard.writeText(config.couponCode);
+    setCopying(true);
+    setTimeout(() => setCopying(false), 2000);
+  };
 
   const handleFormSubmit = async (formData: any) => {
     const newLead: Lead = {
@@ -423,8 +438,68 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       document.body.removeChild(link);
     }
 
+    // Enviar e-mail de cupom se configurado
+    if (page.templateId === 'coupon' && config.couponCode && config.sendCouponEmail && globalSettings?.brevoApiKey) {
+      const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; borderRadius: 12px;">
+          <h2 style="color: #4f46e5; text-align: center;">Seu Cupom Chegou! 🎁</h2>
+          <p>Olá <strong>${formData.nome}</strong>,</p>
+          <p>Parabéns! Você acaba de resgatar seu cupom de desconto exclusivo da <strong>${globalSettings.remetenteNome}</strong>.</p>
+          <div style="background: #f8fafc; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px dashed #cbd5e1;">
+            <span style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #1e293b;">${config.couponCode}</span>
+          </div>
+          <p>Aproveite seu desconto agora mesmo em nosso site.</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #64748b; text-align: center;">Este e-mail foi enviado automaticamente após seu cadastro em nossa página de captura.</p>
+        </div>
+      `;
+      
+      sendEmailBrevoAction({
+        apiKey: globalSettings.brevoApiKey,
+        sender: { name: globalSettings.remetenteNome, email: globalSettings.remetenteEmail },
+        to: [{ email: formData.email, name: formData.nome }],
+        subject: `🎁 Seu Cupom de Desconto: ${config.couponCode}`,
+        htmlContent: html
+      }).catch(err => console.error("Erro ao enviar e-mail de cupom:", err));
+    }
+
+    if (page.templateId === 'coupon' && config.couponCode) {
+      setShowCouponModal(true);
+      return;
+    }
+
     setSubmitted(true);
   };
+
+  const CouponModal = () => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)', padding: '1.5rem' }}>
+       <div className="card" style={{ maxWidth: '420px', width: '100%', textAlign: 'center', padding: '2.5rem 2rem', background: 'white', color: '#1e293b', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', borderRadius: '24px' }}>
+          <div style={{ width: '80px', height: '80px', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+             <CheckCircle2 size={48} />
+          </div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>Sucesso!</h2>
+          <p style={{ opacity: 0.7, marginBottom: '2rem' }}>Seu cadastro foi realizado e seu cupom de desconto foi liberado.</p>
+          
+          <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '2px dashed #e2e8f0', marginBottom: '1.5rem', position: 'relative' }}>
+             <div style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', opacity: 0.5, marginBottom: '0.5rem' }}>Código do Cupom</div>
+             <div style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '2px', color: '#1e3a8a' }}>{config.couponCode}</div>
+          </div>
+
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <button onClick={handleCopyCoupon} style={{ width: '100%', height: '54px', borderRadius: '12px', background: '#1e293b', color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+               {copying ? <><Check size={20} /> Copiado!</> : <><Copy size={20} /> Copiar Código</>}
+            </button>
+            <button onClick={() => { setShowCouponModal(false); setSubmitted(true); }} style={{ width: '100%', height: '54px', borderRadius: '12px', background: 'transparent', color: '#64748b', fontWeight: 600 }}>Fechar</button>
+          </div>
+
+          {config.sendCouponEmail && (
+            <div style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+               <Mail size={16} /> Enviamos uma cópia para seu e-mail
+            </div>
+          )}
+       </div>
+    </div>
+  );
 
   let currentBg = config.backgroundUrl === 'none' ? '' : (config.backgroundUrl || DEFAULT_BGS[page.templateId] || DEFAULT_BGS.professional);
   if (currentBg && typeof currentBg === 'string' && (currentBg.includes('1456513080510') || currentBg.includes('default-catalog-bg.png'))) {
@@ -501,6 +576,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
         </div>
       </div>
       <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
+      {showCouponModal && <CouponModal />}
     </div>
   );
 }

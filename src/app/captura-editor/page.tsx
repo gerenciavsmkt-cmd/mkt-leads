@@ -184,6 +184,8 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formTitulo: 'Resgatar Cupom',
     formSubtitulo: 'Complete o cadastro para ver o código do desconto.',
     formActionType: 'none',
+    couponCode: 'DESC25',
+    sendCouponEmail: true,
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -543,6 +545,31 @@ export default function MultiCapturaEditor() {
                     value={editingPage.config.eventDate || ''}
                     onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, eventDate: e.target.value}})}
                    />
+                </div>
+              )}
+
+              {editingPage.templateId === 'coupon' && (
+                <div style={{ background: 'rgba(251, 191, 36, 0.05)', padding: '1.25rem', borderRadius: '8px', border: '1px dashed #fbbf24' }}>
+                   <div style={{ display: 'grid', gap: '1rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', marginBottom: '0.5rem', display: 'block', color: '#b45309', fontWeight: 600 }}>Código do Cupom</label>
+                        <input 
+                          className="btn-outline" style={{ width: '100%', height: '42px', padding: '0 1rem', background: 'white', textTransform: 'uppercase', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: '1px' }}
+                          placeholder="EX: PROMO25"
+                          value={editingPage.config.couponCode || ''}
+                          onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, couponCode: e.target.value.toUpperCase()}})}
+                        />
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                        <input 
+                          type="checkbox" 
+                          style={{ width: '18px', height: '18px' }}
+                          checked={editingPage.config.sendCouponEmail || false}
+                          onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, sendCouponEmail: e.target.checked}})}
+                        />
+                        <span>Enviar código automaticamente por e-mail</span>
+                      </label>
+                   </div>
                 </div>
               )}
             </div>

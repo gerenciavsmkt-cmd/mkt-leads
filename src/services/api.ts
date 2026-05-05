@@ -33,7 +33,7 @@ const initialSettings: Settings = {
   brevoApiKey: '',
   remetenteNome: 'Minha Empresa',
   remetenteEmail: 'contato@minhaempresa.com',
-  limiteDiario: 300,
+  limiteDiario: 280,
   notificacoes: {
     novosLeads: true,
     errosEnvio: true

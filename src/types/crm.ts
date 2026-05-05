@@ -96,6 +96,8 @@ export interface  LandingPageSettings {
   whatsapp?: WhatsappWidgetConfig;
   formActionType?: 'redirect' | 'download' | 'none';
   formActionUrl?: string;
+  couponCode?: string;
+  sendCouponEmail?: boolean;
 }
 
 export interface LandingPageInstance {

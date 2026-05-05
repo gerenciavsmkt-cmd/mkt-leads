@@ -76,9 +76,15 @@ export async function processQueueServerAction() {
     }
 
     // 3. Verificar limite real no Brevo
-    const remainingLimit = await getBrevoCreditsAction(settings.brevoApiKey);
+    const brevoCredits = await getBrevoCreditsAction(settings.brevoApiKey);
+    
+    // O limite real de processamento é o que o Brevo permite MENOS uma margem de 20 para cupons,
+    // limitado também pelo máximo configurado pelo usuário (280).
+    const dailyConfig = settings.limiteDiario || 280;
+    const remainingLimit = Math.min(brevoCredits - 20, dailyConfig);
+
     if (remainingLimit <= 0) {
-      return { success: false, message: `Limite diário do Brevo atingido (Créditos: ${remainingLimit}).` };
+      return { success: false, message: `Limite diário de campanhas atingido ou em margem de reserva (Disponível no Brevo: ${brevoCredits}, Reservado: 20).` };
     }
 
     // 3. Buscar itens pendentes na fila
