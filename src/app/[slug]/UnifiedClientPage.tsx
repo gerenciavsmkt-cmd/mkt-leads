@@ -462,14 +462,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
 
     // Lógica inteligente para o Catálogo (Lead Magnet)
     if (page.templateId === 'lead-magnet' && catalogType) {
-      if (catalogType === 'compacto' && config.downloadFileUrl) {
-        const link = document.createElement('a');
-        link.href = config.downloadFileUrl;
-        link.download = '';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (catalogType === 'compacto') {
         setSubmitted(true);
         return;
       } else if (catalogType === 'completo' && config.formActionUrl) {
