@@ -413,13 +413,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     setTimeout(() => setCopying(false), 2000);
   };
 
-  const handleFormSubmit = async (formData: any) => {
-    const newLead: Lead = {
-      id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, telefone: formData.telefone, empresa: formData.empresa,
-      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined
-    };
-    await api.saveLead(newLead);
-
+  const handleFinalAction = () => {
     const actionType = config.formActionType;
     const actionUrl = config.formActionUrl || config.downloadFileUrl;
 
@@ -437,6 +431,17 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       link.click();
       document.body.removeChild(link);
     }
+
+    setSubmitted(true);
+    setShowCouponModal(false);
+  };
+
+  const handleFormSubmit = async (formData: any) => {
+    const newLead: Lead = {
+      id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, telefone: formData.telefone, empresa: formData.empresa,
+      origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined
+    };
+    await api.saveLead(newLead);
 
     // Enviar e-mail de cupom se configurado
     if (page.templateId === 'coupon' && config.couponCode && config.sendCouponEmail && globalSettings?.brevoApiKey) {
@@ -468,7 +473,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       return;
     }
 
-    setSubmitted(true);
+    handleFinalAction();
   };
 
   const CouponModal = () => (
@@ -489,7 +494,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
             <button onClick={handleCopyCoupon} style={{ width: '100%', height: '54px', borderRadius: '12px', background: '#1e293b', color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
                {copying ? <><Check size={20} /> Copiado!</> : <><Copy size={20} /> Copiar Código</>}
             </button>
-            <button onClick={() => { setShowCouponModal(false); setSubmitted(true); }} style={{ width: '100%', height: '54px', borderRadius: '12px', background: 'transparent', color: '#64748b', fontWeight: 600 }}>Fechar</button>
+            <button onClick={handleFinalAction} style={{ width: '100%', height: '54px', borderRadius: '12px', background: config.botaoColor || '#fbbf24', color: getContrastColor(config.botaoColor || '#fbbf24'), fontWeight: 700 }}>OK, Continuar</button>
           </div>
 
           {config.sendCouponEmail && (
