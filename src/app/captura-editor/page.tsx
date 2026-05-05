@@ -78,6 +78,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#4285F4',
     formTitulo: 'Solicite uma demonstração',
     formSubtitulo: 'Preencha o formulário e um consultor entrará em contato.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -98,6 +99,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#ffffff',
     formTitulo: 'Receber Material',
     formSubtitulo: 'Informe seus dados para liberar o acesso ao PDF.',
+    formActionType: 'download',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -118,6 +120,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#1e293b',
     formTitulo: 'Garantir Acesso',
     formSubtitulo: 'Cadastre-se para assistir ao conteúdo completo.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -138,6 +141,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#ffffff',
     formTitulo: 'Inscrição Gratuita',
     formSubtitulo: 'Garanta sua vaga no workshop ao vivo.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -158,6 +162,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#1e293b',
     formTitulo: 'Solicitar Proposta',
     formSubtitulo: 'Entraremos em contato o mais breve possível.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -178,6 +183,7 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formColor: '#ffffff',
     formTitulo: 'Resgatar Cupom',
     formSubtitulo: 'Complete o cadastro para ver o código do desconto.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -721,25 +727,49 @@ export default function MultiCapturaEditor() {
           </section>
 
           <section className="card">
-            <h4 style={{ marginBottom: '1rem', fontWeight: 600 }}>Textos do Formulário</h4>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-                <div>
-                   <label style={{ fontSize: '0.75rem', opacity: 0.6 }}>Título do Formulário</label>
-                   <input 
-                    className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem', fontSize: '0.875rem' }}
-                    value={editingPage.config.formTitulo}
-                    onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, formTitulo: e.target.value}})}
-                   />
-                </div>
-                <div>
-                   <label style={{ fontSize: '0.75rem', opacity: 0.6 }}>Subtítulo do Formulário</label>
-                   <input 
-                    className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem', fontSize: '0.875rem' }}
-                    value={editingPage.config.formSubtitulo}
-                    onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, formSubtitulo: e.target.value}})}
-                   />
-                </div>
+            <h4 style={{ marginBottom: '1rem', fontWeight: 600 }}>Ação do Formulário</h4>
+            <p style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '1rem' }}>Escolha o que acontece após o Lead clicar no botão.</p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+              {(['redirect', 'download', 'none'] as const).map(type => (
+                <button 
+                  key={type}
+                  onClick={() => setEditingPage({...editingPage, config: {...editingPage.config, formActionType: type}})}
+                  style={{ 
+                    padding: '0.75rem 0.5rem', 
+                    borderRadius: '8px', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 600,
+                    border: editingPage.config.formActionType === type ? '2px solid var(--primary)' : '1px solid #e2e8f0',
+                    background: editingPage.config.formActionType === type ? 'rgba(99, 102, 241, 0.05)' : 'white',
+                    color: editingPage.config.formActionType === type ? 'var(--primary)' : 'inherit',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {type === 'redirect' ? 'Redirecionar' : type === 'download' ? 'Download' : 'Nenhuma'}
+                </button>
+              ))}
             </div>
+
+            {editingPage.config.formActionType !== 'none' && (
+              <div>
+                <label style={{ fontSize: '0.75rem', opacity: 0.6 }}>{editingPage.config.formActionType === 'redirect' ? 'URL de Destino (Link/WhatsApp)' : 'Link do Arquivo (PDF/Imagem)'}</label>
+                <input 
+                  className="btn-outline" style={{ width: '100%', height: '40px', padding: '0 0.75rem', fontSize: '0.875rem', marginTop: '0.4rem' }}
+                  placeholder={editingPage.config.formActionType === 'redirect' ? 'https://wa.me/...' : 'https://exemplo.com/arquivo.pdf'}
+                  value={editingPage.config.formActionUrl || (editingPage.config.formActionType === 'download' ? editingPage.config.downloadFileUrl : '') || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const updates: any = { formActionUrl: val };
+                    if (editingPage.config.formActionType === 'download') updates.downloadFileUrl = val;
+                    setEditingPage({...editingPage, config: {...editingPage.config, ...updates}});
+                  }}
+                />
+                <p style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '0.5rem' }}>
+                  {editingPage.config.formActionType === 'redirect' ? 'O Lead será redirecionado para este link após converter.' : 'O download começará automaticamente ou o link será liberado.'}
+                </p>
+              </div>
+            )}
           </section>
 
           <section className="card">

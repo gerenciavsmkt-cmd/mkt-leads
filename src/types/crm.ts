@@ -94,6 +94,8 @@ export interface  LandingPageSettings {
   eventDate?: string;
   accentColor?: string;
   whatsapp?: WhatsappWidgetConfig;
+  formActionType?: 'redirect' | 'download' | 'none';
+  formActionUrl?: string;
 }
 
 export interface LandingPageInstance {

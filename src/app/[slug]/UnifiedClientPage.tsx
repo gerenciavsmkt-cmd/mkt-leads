@@ -404,6 +404,25 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: [page.templateId, page.slug], consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined
     };
     await api.saveLead(newLead);
+
+    const actionType = config.formActionType;
+    const actionUrl = config.formActionUrl || config.downloadFileUrl;
+
+    if (actionType === 'redirect' && actionUrl) {
+      window.location.href = actionUrl;
+      return;
+    }
+
+    if (actionType === 'download' && actionUrl) {
+      const link = document.createElement('a');
+      link.href = actionUrl;
+      link.download = '';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     setSubmitted(true);
   };
 
