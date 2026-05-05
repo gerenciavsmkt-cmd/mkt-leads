@@ -58,7 +58,7 @@ export interface FilaEnvio {
   prioridade: number;
 }
 
-export type LandingPageTemplate = 'professional' | 'lead-magnet' | 'vsl' | 'minimalist' | 'event' | 'coupon';
+export type LandingPageTemplate = 'professional' | 'lead-magnet' | 'vsl' | 'minimalist' | 'event' | 'coupon' | 'offers';
 
 export interface Attendant {
   id: string;

@@ -313,7 +313,7 @@ function CaptureForm({ config, templateId, onSubmit }: { config: any, templateId
 
   return (
     <div className="lp-form-container" style={{ background: config.formColor || '#4285F4', color: textColor, padding: '2rem' }}>
-      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '1.85rem', fontWeight: 700, marginBottom: '0.4rem', color: textColor }}>{config.formTitulo}</h2>
         <p style={{ fontSize: '0.9rem', opacity: 0.9, color: textColor }}>{config.formSubtitulo}</p>
       </div>
@@ -368,7 +368,7 @@ function CaptureForm({ config, templateId, onSubmit }: { config: any, templateId
           </div>
         )}
         <label style={{ display: 'flex', gap: '0.5rem', cursor: 'pointer', fontSize: '0.75rem', color: textColor }}><input type="checkbox" style={{ width: '16px', height: '16px' }} checked={formData.consentimento} onChange={e => setFormData({...formData, consentimento: e.target.checked})} /><span>Concordo com as comunicações de marketing (LGPD).</span></label>
-        <button type="submit" style={{ height: '52px', borderRadius: '12px', background: config.botaoColor || '#fbbf24', color: btnTextColor, fontWeight: 700, fontSize: '1.1rem', width: '100%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+        <button type="submit" style={{ height: '52px', marginTop: '1rem', borderRadius: '12px', background: config.botaoColor || '#fbbf24', color: btnTextColor, fontWeight: 700, fontSize: '1.1rem', width: '100%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
           {templateId === 'lead-magnet' 
             ? (formData.catalogType === 'compacto' ? 'Baixar catálogo agora' : 'Acessar catálogo') 
             : (config.botaoTexto || 'Falar com um consultor')} 
@@ -450,6 +450,11 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
   const [copying, setCopying] = useState(false);
   const config = page?.config || {} as any;
 
+  // Atualização forçada de subtítulo se for o antigo
+  if (page.templateId === 'professional' && config.formSubtitulo === 'Preencha o formulário e um consultor entrará em contato.') {
+    config.formSubtitulo = 'Preencha o formulário para falar com um consultor';
+  }
+
   useEffect(() => {
     api.getSettings().then(setGlobalSettings);
   }, []);
@@ -500,6 +505,9 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     if (page.templateId === 'lead-magnet' && formData.catalogType) {
       tags.push(formData.catalogType === 'compacto' ? 'PDF' : 'online');
     }
+    if (page.templateId === 'offers') {
+      tags.push('ofertas');
+    }
 
     const newLead: Lead = {
       id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, celular: formData.telefone, empresa: formData.empresa,
@@ -518,7 +526,8 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
           <div style="background: #f8fafc; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px dashed #cbd5e1;">
             <span style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #1e293b;">${config.couponCode}</span>
           </div>
-          <p>Aproveite seu desconto agora mesmo em nosso site.</p>
+          <p>Queremos oferecer a você um desconto especial de 10% na sua primeira compra em nosso site. Acreditamos que nossas soluções em precificações ajudarão a impulsionar suas vendas no PDV.</p>
+          <p>Use o código: <strong>${config.couponCode}</strong> e aplique o cupom para obter seu desconto exclusivo!</p>
           <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
           <p style="font-size: 12px; color: #64748b; text-align: center;">Este e-mail foi enviado automaticamente após seu cadastro em nossa página de captura.</p>
         </div>

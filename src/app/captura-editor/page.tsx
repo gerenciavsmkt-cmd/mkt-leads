@@ -23,7 +23,8 @@ import {
   Copy,
   LayoutTemplate,
   MessageCircle,
-  User
+  User,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -63,6 +64,12 @@ const TEMPLATES: { id: LandingPageTemplate; label: string; icon: any; descriptio
     label: 'Cupom de Desconto', 
     icon: ImageIcon,
     description: 'Design festivo para ofertas especiais e códigos de desconto.'
+  },
+  { 
+    id: 'offers', 
+    label: 'Newsletter de Ofertas', 
+    icon: Mail, 
+    description: 'Focado em capturar leads para campanhas de ofertas e promoções.'
   }
 ];
 const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings>> = {
@@ -76,9 +83,9 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     backgroundUrl: '/images/sales-bg.png',
     botaoColor: '#FFB948',
     formColor: '#4285F4',
-    formTitulo: 'Solicite uma demonstração',
-    formSubtitulo: 'Preencha o formulário e um consultor entrará em contato.',
-    formActionType: 'none',
+    formTitulo: 'Falar com um consultor',
+    formSubtitulo: 'Preencha o formulário para falar com um consultor',
+    formActionType: 'redirect',
     whatsapp: {
       enabled: true,
       posicao: 'right',
@@ -186,6 +193,27 @@ const TEMPLATE_DEFAULTS: Record<LandingPageTemplate, Partial<LandingPageSettings
     formActionType: 'none',
     couponCode: 'DESC25',
     sendCouponEmail: true,
+    whatsapp: {
+      enabled: true,
+      posicao: 'right',
+      atendentes: [
+        { id: '1', nome: 'Suporte Visual Super', cargo: 'Atendimento Comercial', telefone: '554899999999', disponibilidade: 'Segunda a Sexta, 08h às 18h' }
+      ]
+    }
+  },
+  offers: {
+    titulo: 'OFERTAS EXCLUSIVAS',
+    subtitulo: 'Fique por dentro de todas as nossas',
+    destaque: 'Promoções e Novidades',
+    descricao: 'Inscreva-se em nossa newsletter de ofertas para receber em primeira mão descontos exclusivos, lançamentos e oportunidades únicas diretamente no seu e-mail.',
+    beneficios: ['Descontos de até 50%', 'Acesso Antecipado', 'Conteúdo VIP'],
+    botaoTexto: 'Quero Receber Ofertas',
+    backgroundUrl: '/images/offers-bg.png',
+    botaoColor: '#f59e0b',
+    formColor: '#ffffff',
+    formTitulo: 'Inscrever-se',
+    formSubtitulo: 'Preencha os dados para entrar na lista de ofertas.',
+    formActionType: 'none',
     whatsapp: {
       enabled: true,
       posicao: 'right',
