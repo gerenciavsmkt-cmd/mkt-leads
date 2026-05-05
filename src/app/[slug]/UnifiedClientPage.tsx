@@ -509,10 +509,17 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       tags.push('ofertas');
     }
 
+    let observacoes = '';
+    if (page.templateId === 'lead-magnet' && formData.catalogType) {
+      observacoes = `[ESCOLHA] Interessado no catálogo ${formData.catalogType}.`;
+    } else if (page.templateId === 'offers') {
+      observacoes = `[INTERESSE] Inscrito na lista de ofertas exclusivas.`;
+    }
+
     const newLead: Lead = {
       id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, celular: formData.telefone, empresa: formData.empresa,
       origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: tags, consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined,
-      observacoes: formData.catalogType ? `[ESCOLHA] Interessado no catálogo ${formData.catalogType}.` : ''
+      observacoes: observacoes
     };
     await api.saveLead(newLead);
 
