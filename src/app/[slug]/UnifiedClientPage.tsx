@@ -502,7 +502,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     }
 
     const newLead: Lead = {
-      id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, telefone: formData.telefone, empresa: formData.empresa,
+      id: Math.random().toString(36).substr(2, 9), nome: formData.nome, email: formData.email, celular: formData.telefone, empresa: formData.empresa,
       origem: page.slug, dataCriacao: new Date().toISOString(), status: 'novo', tags: tags, consentimentoLGPD: true, utm_source: searchParams.get('utm_source') || undefined,
       observacoes: formData.catalogType ? `[ESCOLHA] Interessado no catálogo ${formData.catalogType}.` : ''
     };
