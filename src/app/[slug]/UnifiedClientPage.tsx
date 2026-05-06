@@ -640,6 +640,17 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
             <CaptureForm config={config} templateId={page.templateId} onSubmit={handleFormSubmit} />
           </div>
         </div>
+        <div style={{ width: '100%', maxWidth: '900px', margin: '2rem auto 4rem', padding: '0 1.5rem', textAlign: 'center', opacity: 0.7 }}>
+          <hr style={{ border: '0', borderTop: '1px solid rgba(255,255,255,0.1)', marginBottom: '2rem' }} />
+          <p style={{ fontSize: '0.85rem', lineHeight: 1.6, marginBottom: '1rem' }}>
+            {config.footerText || 'Nós respeitamos sua privacidade e utilizamos seus dados apenas para as finalidades informadas.'}
+          </p>
+          {config.privacyPolicyUrl && (
+            <a href={config.privacyPolicyUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', fontSize: '0.85rem', textDecoration: 'underline' }}>
+              Política de Privacidade
+            </a>
+          )}
+        </div>
         <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
       </div>
     );
@@ -661,6 +672,17 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
           </div>
           <div><CaptureForm config={config} templateId={page.templateId} onSubmit={handleFormSubmit} /></div>
         </div>
+      </div>
+      <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem 4rem', textAlign: 'center', opacity: 0.6, position: 'relative', zIndex: 1 }}>
+        <hr style={{ border: '0', borderTop: '1px solid rgba(255,255,255,0.1)', marginBottom: '1.5rem' }} />
+        <p style={{ fontSize: '0.8rem', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+          {config.footerText || 'Nós respeitamos sua privacidade e utilizamos seus dados apenas para as finalidades informadas.'}
+        </p>
+        {config.privacyPolicyUrl && (
+          <a href={config.privacyPolicyUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', fontSize: '0.8rem', textDecoration: 'underline' }}>
+            Política de Privacidade
+          </a>
+        )}
       </div>
       <WhatsappWidget config={config.whatsapp} pageSlug={page.slug} />
       {showCouponModal && <CouponModal />}

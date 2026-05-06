@@ -24,7 +24,8 @@ import {
   LayoutTemplate,
   MessageCircle,
   User,
-  Mail
+  Mail,
+  Shield
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -632,6 +633,34 @@ export default function MultiCapturaEditor() {
                   }} style={{ color: 'var(--danger)', opacity: 0.5 }}><Trash2 size={18} /></button>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* RODAPÉ E LGPD */}
+          <section className="card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', fontWeight: 600 }}>
+                <Shield size={20} className="color-primary" /> Rodapé e LGPD
+            </div>
+            <div style={{ display: 'grid', gap: '1.25rem' }}>
+              <div>
+                <label style={{ fontSize: '0.875rem', marginBottom: '0.5rem', display: 'block', fontWeight: 500 }}>Texto Informativo de Rodapé</label>
+                <textarea 
+                  className="btn-outline" style={{ width: '100%', height: '80px', padding: '0.75rem', fontSize: '0.875rem' }}
+                  placeholder="Ex: Nós respeitamos sua privacidade e utilizamos seus dados apenas para as finalidades informadas."
+                  value={editingPage.config.footerText || ''}
+                  onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, footerText: e.target.value}})}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.875rem', marginBottom: '0.5rem', display: 'block', fontWeight: 500 }}>Link da Política de Privacidade</label>
+                <input 
+                  className="btn-outline" style={{ width: '100%', height: '42px', padding: '0 1rem' }}
+                  placeholder="https://suaempresa.com.br/politica-de-privacidade"
+                  value={editingPage.config.privacyPolicyUrl || ''}
+                  onChange={e => setEditingPage({...editingPage, config: {...editingPage.config, privacyPolicyUrl: e.target.value}})}
+                />
+                <p style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '0.5rem' }}>Se deixado em branco, a página usará as configurações globais.</p>
+              </div>
             </div>
           </section>
 

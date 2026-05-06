@@ -98,6 +98,8 @@ export interface  LandingPageSettings {
   formActionUrl?: string;
   couponCode?: string;
   sendCouponEmail?: boolean;
+  footerText?: string;
+  privacyPolicyUrl?: string;
 }
 
 export interface LandingPageInstance {
@@ -134,6 +136,8 @@ export interface Settings {
     headerColor?: string;
     ogLogoUrl?: string;
     faviconUrl?: string;
+    footerText?: string;
+    privacyPolicyUrl?: string;
   };
   empresa: {
     website: string;

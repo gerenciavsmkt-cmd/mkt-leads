@@ -324,6 +324,35 @@ export default function ConfigPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                  Texto de Rodapé (Informação sobre uso de dados / LGPD)
+                </label>
+                <textarea 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '80px', padding: '0.75rem', fontSize: '0.875rem' }} 
+                  placeholder="Ex: Nós respeitamos sua privacidade e utilizamos seus dados apenas para as finalidades informadas."
+                  value={settings.landingPage?.footerText || ''}
+                  onChange={e => setSettings({...settings, landingPage: {...settings.landingPage, footerText: e.target.value}})}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                  URL da Página de Política de Privacidade
+                </label>
+                <input 
+                  type="text" 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                  placeholder="https://suaempresa.com.br/politica-de-privacidade"
+                  value={settings.landingPage?.privacyPolicyUrl || ''}
+                  onChange={e => setSettings({...settings, landingPage: {...settings.landingPage, privacyPolicyUrl: e.target.value}})}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Nome do Remetente</label>
                 <input 
                   type="text" 
