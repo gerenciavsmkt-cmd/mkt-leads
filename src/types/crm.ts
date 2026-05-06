@@ -149,7 +149,8 @@ export interface Settings {
   };
   whatsappWidget?: WhatsappWidgetConfig;
   omnichannel?: {
-    metaPageAccessToken?: string;
+    messengerAccessToken?: string;
+    instagramAccessToken?: string;
     metaVerifyToken?: string;
     evolutionApiKey?: string;
     evolutionInstanceName?: string;

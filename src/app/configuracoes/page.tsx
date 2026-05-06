@@ -459,15 +459,29 @@ export default function ConfigPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Token de Acesso da Página (Meta)</label>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Token de Acesso - Facebook Messenger</label>
               <textarea 
                 className="btn-outline" 
-                style={{ width: '100%', height: '100px', padding: '0.75rem', fontSize: '0.8rem', fontFamily: 'monospace' }} 
-                placeholder="Cole aqui o token gerado no painel da Meta..."
-                value={settings.omnichannel?.metaPageAccessToken || ''}
+                style={{ width: '100%', height: '80px', padding: '0.75rem', fontSize: '0.8rem', fontFamily: 'monospace' }} 
+                placeholder="Cole aqui o token do Messenger..."
+                value={settings.omnichannel?.messengerAccessToken || ''}
                 onChange={e => setSettings({
                   ...settings, 
-                  omnichannel: { ...settings.omnichannel, metaPageAccessToken: e.target.value }
+                  omnichannel: { ...settings.omnichannel, messengerAccessToken: e.target.value }
+                })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Token de Acesso - Instagram</label>
+              <textarea 
+                className="btn-outline" 
+                style={{ width: '100%', height: '80px', padding: '0.75rem', fontSize: '0.8rem', fontFamily: 'monospace' }} 
+                placeholder="Cole aqui o token do Instagram..."
+                value={settings.omnichannel?.instagramAccessToken || ''}
+                onChange={e => setSettings({
+                  ...settings, 
+                  omnichannel: { ...settings.omnichannel, instagramAccessToken: e.target.value }
                 })}
               />
             </div>
