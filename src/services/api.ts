@@ -1,4 +1,4 @@
-import { Lead, Campaign, FilaEnvio, Settings, LandingPageInstance, LandingPageSettings, BioLink, UserProfile, Segmentation } from '@/types/crm';
+import { Lead, Campaign, FilaEnvio, Settings, LandingPageInstance, LandingPageSettings, BioLink, UserProfile, Segmentation, PopupConfig } from '@/types/crm';
 import { db } from '@/lib/firebase';
 import { sendEmailBrevoAction } from '@/app/actions/brevo';
 import { processQueueServerAction } from '@/app/actions/queue';
@@ -26,7 +26,8 @@ const COLLECTIONS = {
   LANDING_PAGES: 'landing_pages',
   BIO_LINKS: 'bio_links',
   USERS: 'users',
-  SEGMENTATIONS: 'segmentations'
+  SEGMENTATIONS: 'segmentations',
+  POPUPS: 'popups'
 };
 
 const initialSettings: Settings = {
@@ -423,5 +424,31 @@ export const api = {
 
   deleteSegmentation: async (id: string) => {
     await deleteDoc(doc(db, COLLECTIONS.SEGMENTATIONS, id));
+  },
+
+  // Popups
+  getPopups: async (): Promise<PopupConfig[]> => {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.POPUPS));
+    const popups: PopupConfig[] = [];
+    querySnapshot.forEach((doc) => {
+      popups.push({ id: doc.id, ...doc.data() } as PopupConfig);
+    });
+    return popups.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
+  },
+
+  savePopup: async (popup: PopupConfig) => {
+    const sanitized = JSON.parse(JSON.stringify(popup));
+    const popupRef = doc(db, COLLECTIONS.POPUPS, popup.id);
+    const snap = await getDoc(popupRef);
+    if (snap.exists()) {
+      await updateDoc(popupRef, sanitized);
+    } else {
+      await setDoc(popupRef, sanitized);
+    }
+    return popup;
+  },
+
+  deletePopup: async (id: string) => {
+    await deleteDoc(doc(db, COLLECTIONS.POPUPS, id));
   }
 };

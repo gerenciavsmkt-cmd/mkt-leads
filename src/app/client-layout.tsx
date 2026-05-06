@@ -24,7 +24,8 @@ import {
   LogIn,
   ShieldCheck,
   ShieldAlert,
-  Filter
+  Filter,
+  SquareStack
 } from 'lucide-react';
 import { 
   collection, 
@@ -55,7 +56,8 @@ export default function ClientLayout({
     '/whatsapp',
     '/bio',
     '/usuarios',
-    '/segmentacoes'
+    '/segmentacoes',
+    '/popups'
   ];
 
   // Se a rota NÃO estiver na lista acima, consideramos que é uma Página de Captura pública
@@ -208,6 +210,10 @@ export default function ClientLayout({
             <Link href="/bio" className={`nav-link ${pathname === '/bio' ? 'active' : ''}`}>
               <Smartphone size={20} />
               <span className="nav-text">Link na Bio</span>
+            </Link>
+            <Link href="/popups" className={`nav-link ${pathname === '/popups' ? 'active' : ''}`}>
+              <SquareStack size={20} />
+              <span className="nav-text">Pop-ups</span>
             </Link>
             <Link href="/configuracoes" className={`nav-link ${pathname === '/configuracoes' ? 'active' : ''}`}>
               <SettingsIcon size={20} />

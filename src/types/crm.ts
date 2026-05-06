@@ -222,3 +222,31 @@ export interface Segmentation {
   leadIds: string[];
   dataCriacao: string;
 }
+
+// --- POPUPS ---
+export type PopupTrigger = 'timer' | 'exit-intent' | 'scroll';
+export type PopupTemplate = 'simple' | 'image-left' | 'image-right' | 'image-top' | 'lead-form' | 'image-form-left' | 'image-form-right' | 'coupon' | 'horizontal-banner';
+
+export interface PopupConfig {
+  id: string;
+  name: string;
+  templateId: PopupTemplate;
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  buttonText: string;
+  buttonLink: string;
+  couponCode?: string;
+  trigger: PopupTrigger;
+  triggerValue?: number; // segundos para timer, porcentagem para scroll
+  isActive: boolean;
+  dataCriacao: string;
+  pages?: string[]; // Slugs das páginas onde deve aparecer (vazio = todas)
+  theme?: {
+    backgroundColor?: string;
+    textColor?: string;
+    buttonColor?: string;
+    buttonTextColor?: string;
+    overlayColor?: string;
+  };
+}
