@@ -67,9 +67,14 @@ export default function ConfigPage() {
   }, []);
 
   const handleSave = async () => {
-    await api.saveSettings(settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      await api.saveSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar as configurações. Por favor, verifique se todos os campos estão corretos.');
+    }
   };
 
   const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number = 0.7): Promise<string> => {
@@ -435,6 +440,51 @@ export default function ConfigPage() {
                   onChange={e => setSettings({...settings, empresa: {...settings.empresa, youtube: e.target.value}})}
                 />
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* OMNICHANNEL & CANAIS */}
+        <section className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <Share2 className="color-primary" size={20} />
+            <h3 style={{ fontSize: '1.25rem' }}>Omnichannel (Instagram & Facebook)</h3>
+          </div>
+          
+          <div style={{ display: 'grid', gap: '1.25rem' }}>
+            <div style={{ padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', marginBottom: '0.5rem' }}>
+               <p style={{ fontSize: '0.85rem', color: '#4338ca', lineHeight: 1.5 }}>
+                 <strong>Configuração Meta:</strong> Use esta seção para conectar suas páginas do Facebook e perfis do Instagram. O Token de Acesso permite que o sistema responda mensagens automaticamente.
+               </p>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Token de Acesso da Página (Meta)</label>
+              <textarea 
+                className="btn-outline" 
+                style={{ width: '100%', height: '100px', padding: '0.75rem', fontSize: '0.8rem', fontFamily: 'monospace' }} 
+                placeholder="Cole aqui o token gerado no painel da Meta..."
+                value={settings.omnichannel?.metaPageAccessToken || ''}
+                onChange={e => setSettings({
+                  ...settings, 
+                  omnichannel: { ...settings.omnichannel, metaPageAccessToken: e.target.value }
+                })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Token de Verificação (Webhook)</label>
+              <input 
+                type="text" 
+                className="btn-outline" 
+                style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                placeholder="Padrão: gerency_leads_token"
+                value={settings.omnichannel?.metaVerifyToken || 'gerency_leads_token'}
+                onChange={e => setSettings({
+                  ...settings, 
+                  omnichannel: { ...settings.omnichannel, metaVerifyToken: e.target.value }
+                })}
+              />
             </div>
           </div>
         </section>

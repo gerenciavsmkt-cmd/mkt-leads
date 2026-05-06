@@ -148,6 +148,12 @@ export interface Settings {
     youtube: string;
   };
   whatsappWidget?: WhatsappWidgetConfig;
+  omnichannel?: {
+    metaPageAccessToken?: string;
+    metaVerifyToken?: string;
+    evolutionApiKey?: string;
+    evolutionInstanceName?: string;
+  };
 }
 
 // --- LINK NA BIO ---

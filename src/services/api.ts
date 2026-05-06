@@ -272,17 +272,16 @@ export const api = {
       backgroundUrl: backgroundUrl || ''
     };
 
-    const baseSettings = {
+    const baseSettings = JSON.parse(JSON.stringify({
       ...settings,
       landingPage: {
         ...otherLp,
-        // Mantemos 'none' ou strings curtas no global para não dar erro
         logoUrl: logoUrl?.startsWith('data:') ? 'none' : (logoUrl || ''),
         ogLogoUrl: ogLogoUrl?.startsWith('data:') ? 'none' : (ogLogoUrl || ''),
         faviconUrl: faviconUrl?.startsWith('data:') ? 'none' : (faviconUrl || ''),
         backgroundUrl: backgroundUrl?.startsWith('data:') ? 'none' : (backgroundUrl || '')
       }
-    };
+    }));
 
     await Promise.all([
       setDoc(doc(db, COLLECTIONS.SETTINGS, 'global'), baseSettings),
