@@ -70,12 +70,11 @@ export async function POST(req: NextRequest) {
         const messageText = messaging.message.text;
         const channel = body.object === 'instagram' ? 'instagram' : 'facebook';
 
-        // 1. Verificar se já existe um ChatSession para este senderId
-        const chatsRef = collection(db, 'chats');
-        const q = query(chatsRef, where('leadId', '==', senderId), where('channel', '==', channel));
-        const querySnapshot = await getDocs(q);
+        // 1. Verificar se já existe um ChatSession para este senderId usando ID determinístico
+        const chatId = `${channel}_${senderId}`;
+        const chatRef = doc(db, 'chats', chatId);
+        const chatSnap = await getDoc(chatRef);
 
-        let chatId = '';
         let leadName = 'Lead via ' + (channel === 'instagram' ? 'Instagram' : 'Facebook');
         let leadAvatar = null;
 
@@ -86,8 +85,8 @@ export async function POST(req: NextRequest) {
           if (profile.avatar) leadAvatar = profile.avatar;
         }
 
-        if (querySnapshot.empty) {
-          // Criar novo chat e possivelmente novo lead
+        if (!chatSnap.exists()) {
+          // Criar novo chat
           const newChat: Partial<ChatSession> = {
             leadId: senderId,
             leadName: leadName,
@@ -99,8 +98,7 @@ export async function POST(req: NextRequest) {
             status: 'active',
             dataCriacao: new Date().toISOString()
           };
-          const docRef = await addDoc(chatsRef, newChat);
-          chatId = docRef.id;
+          await setDoc(chatRef, newChat);
 
           // Criar/Atualizar lead no CRM
           const leadData: Lead = {
@@ -114,17 +112,13 @@ export async function POST(req: NextRequest) {
             dataCriacao: new Date().toISOString(),
             consentimentoLGPD: true
           };
-          
-          // Usar setDoc com o ID da plataforma para evitar duplicados e facilitar busca
           await setDoc(doc(db, 'leads', senderId), leadData);
         } else {
           // Atualizar chat existente
-          const chatDoc = querySnapshot.docs[0];
-          chatId = chatDoc.id;
-          const chatData = chatDoc.data() as ChatSession;
+          const chatData = chatSnap.data() as ChatSession;
           
-          await updateDoc(doc(db, 'chats', chatId), {
-            leadName: leadName, // Atualizar caso o nome tenha sido obtido agora
+          await updateDoc(chatRef, {
+            leadName: leadName,
             leadAvatar: leadAvatar,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
