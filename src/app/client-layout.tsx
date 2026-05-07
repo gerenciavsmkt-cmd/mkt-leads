@@ -265,7 +265,7 @@ export default function ClientLayout({
               <LogIn size={20} />
               <span className="nav-text">Sair</span>
             </button>
-            <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center' }}>v1.2.0 - NOVO ATENDIMENTO</p>
+            <p style={{ fontSize: '0.75rem', opacity: 0.5, textAlign: 'center' }}>v1.2.0</p>
           </div>
         </aside>
         
