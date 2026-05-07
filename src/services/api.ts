@@ -117,29 +117,7 @@ export const api = {
   },
 
   deleteLead: async (id: string) => {
-    try {
-      // 1. Excluir o lead
-      await deleteDoc(doc(db, COLLECTIONS.LEADS, id));
-      
-      // 2. Tentar excluir chats associados (opcional, para limpeza)
-      // Procuramos por chats que tenham este leadId ou que tenham o ID id
-      const chatsRef = collection(db, COLLECTIONS.CHATS);
-      const q = query(chatsRef, where('leadId', '==', id));
-      const chatSnaps = await getDocs(q);
-      
-      for (const chatDoc of chatSnaps.docs) {
-        await deleteDoc(doc(db, COLLECTIONS.CHATS, chatDoc.id));
-      }
-
-      // Tentar deletar o chat com o ID direto também (nosso novo padrão)
-      // Tentamos instagram_ID e facebook_ID
-      await deleteDoc(doc(db, COLLECTIONS.CHATS, `instagram_${id}`));
-      await deleteDoc(doc(db, COLLECTIONS.CHATS, `facebook_${id}`));
-      
-    } catch (error) {
-      console.error('Erro ao excluir lead:', error);
-      throw error;
-    }
+    await deleteDoc(doc(db, COLLECTIONS.LEADS, id));
   },
 
   // Campaigns
