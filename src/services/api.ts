@@ -484,18 +484,45 @@ export const api = {
     return messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   },
 
-  sendMessage: async (message: ChatMessage) => {
-    const sanitized = JSON.parse(JSON.stringify(message));
-    await addDoc(collection(db, COLLECTIONS.MESSAGES), sanitized);
+  sendMessage: async (message: any) => {
+    // 1. Determinar o ID correto do chat (Forçar ID determinístico para Meta)
+    let finalChatId = message.chatId;
     
-    // Atualizar o chat session com a última mensagem
-    const chatRef = doc(db, COLLECTIONS.CHATS, message.chatId);
-    await updateDoc(chatRef, {
-      lastMessage: message.content,
-      lastTimestamp: message.timestamp,
-      unreadCount: 0
+    if (message.channel === 'instagram' || message.channel === 'facebook') {
+      if (message.leadId) {
+        finalChatId = `${message.channel}_${message.leadId}`;
+      }
+    }
+
+    // 2. Salvar a mensagem
+    const docRef = await addDoc(collection(db, COLLECTIONS.MESSAGES), {
+      ...message,
+      chatId: finalChatId, // Garantir que a mensagem aponte para o ID certo
+      timestamp: new Date().toISOString()
     });
-    
+
+    // 3. Atualizar o ChatSession com a última mensagem
+    if (finalChatId) {
+      await updateDoc(doc(db, COLLECTIONS.CHATS, finalChatId), {
+        lastMessage: message.content,
+        lastTimestamp: new Date().toISOString(),
+        unreadCount: 0
+      }).catch(async (err) => {
+        // Se o documento não existir (ex: chat novo sendo iniciado pelo atendente), criamos ele
+        if (err.code === 'not-found' && message.leadId) {
+           await setDoc(doc(db, COLLECTIONS.CHATS, finalChatId), {
+             id: finalChatId,
+             leadId: message.leadId,
+             leadName: message.leadName || 'Lead',
+             channel: message.channel,
+             lastMessage: message.content,
+             lastTimestamp: new Date().toISOString(),
+             unreadCount: 0,
+             status: 'active'
+           });
+        }
+      });
+    }
     return message;
   },
 

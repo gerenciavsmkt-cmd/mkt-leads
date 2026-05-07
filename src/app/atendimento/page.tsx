@@ -141,16 +141,17 @@ export default function AtendimentoPage() {
     const chat = chats.find(c => c.id === selectedChatId);
     if (!chat) return;
 
-    const msg: ChatMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      chatId: selectedChatId,
-      senderId: 'atendente_admin', // Idealmente pegar do profile do usuário logado
-      senderName: 'Atendente',
+    const msg = {
+      chatId: chat.id,
       content: newMessage,
+      senderId: 'atendente_admin',
+      senderName: 'Atendente',
       timestamp: new Date().toISOString(),
-      type: 'text',
+      type: 'text' as const,
       status: 'sent',
-      isIncoming: false
+      isIncoming: false,
+      channel: chat.channel,
+      leadId: chat.leadId
     };
 
     const messageToSend = newMessage;
@@ -160,9 +161,9 @@ export default function AtendimentoPage() {
     // Enviar para o Meta (Facebook/Instagram)
     if (chat?.channel && chat?.leadId) {
       const result = await sendMetaMessageAction(
-        chat.leadId, // Usar o leadId (ID puro da plataforma)
-        chat.channel,
-        messageToSend
+        chat.leadId, 
+        messageToSend,
+        chat.channel as 'instagram' | 'facebook'
       );
 
       if (!result.success) {
