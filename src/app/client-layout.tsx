@@ -26,7 +26,8 @@ import {
   ShieldAlert,
   Filter,
   SquareStack,
-  MessageSquare
+  MessageSquare,
+  Zap
 } from 'lucide-react';
 import { 
   collection, 
