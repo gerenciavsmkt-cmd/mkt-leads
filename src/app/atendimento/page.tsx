@@ -152,6 +152,7 @@ export default function AtendimentoPage() {
       isIncoming: false
     };
 
+    const messageToSend = newMessage;
     setNewMessage('');
     await api.sendMessage(msg);
 
@@ -160,7 +161,7 @@ export default function AtendimentoPage() {
       const result = await sendMetaMessageAction(
         chat.leadId, // Usar o leadId (ID puro da plataforma)
         chat.channel,
-        newMessage
+        messageToSend
       );
 
       if (!result.success) {
