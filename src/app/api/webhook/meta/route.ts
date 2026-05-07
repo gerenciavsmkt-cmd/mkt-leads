@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
         // 1. Identificador Único e Determinístico (Garante que nunca haverá duplicados)
         const chatId = `${channel}_${senderId}`;
-        const chatRef = doc(db, 'chat_sessions', chatId);
+        const chatRef = doc(db, 'atendimentos_v3', chatId);
         let chatSnap = await getDoc(chatRef);
 
         let leadName = 'Lead via ' + (channel === 'instagram' ? 'Instagram' : 'Facebook');
