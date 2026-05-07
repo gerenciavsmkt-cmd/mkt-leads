@@ -164,8 +164,8 @@ export default function AtendimentoPage() {
       if (chat.channel === 'instagram' || chat.channel === 'facebook') {
         const result = await sendMetaMessageAction(
           chat.leadId, 
-          messageToSend,
-          chat.channel
+          chat.channel as 'instagram' | 'facebook',
+          messageToSend
         );
 
         if (!result.success) {
