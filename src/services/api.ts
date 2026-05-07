@@ -83,7 +83,9 @@ export const api = {
     const querySnapshot = await getDocs(collection(db, COLLECTIONS.LEADS));
     const leads: Lead[] = [];
     querySnapshot.forEach((doc) => {
-      leads.push({ id: doc.id, ...doc.data() } as Lead);
+      // Garantimos que o ID do documento seja o ID usado no objeto, 
+      // sobrescrevendo qualquer campo 'id' que venha do doc.data()
+      leads.push({ ...doc.data(), id: doc.id } as Lead);
     });
     return leads.sort((a, b) => {
       const dateA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
