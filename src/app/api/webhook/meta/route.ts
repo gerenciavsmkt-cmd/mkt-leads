@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
             lastTimestamp: new Date().toISOString(),
             unreadCount: isEcho ? 0 : 1,
             status: 'active',
-            avatar: leadAvatar
+            leadAvatar: leadAvatar
           };
           await setDoc(chatRef, newChat);
         } else {
@@ -166,8 +166,8 @@ export async function POST(req: NextRequest) {
             if (!chatData?.leadName || chatData.leadName.startsWith('Lead via')) {
               updateData.leadName = profile.name || chatData?.leadName;
             }
-            if (!chatData?.avatar) {
-              updateData.avatar = profile.avatar || chatData?.avatar;
+            if (!chatData?.leadAvatar) {
+              updateData.leadAvatar = profile.avatar || chatData?.leadAvatar;
             }
           }
 
