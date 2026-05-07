@@ -39,16 +39,22 @@ async function getMetaProfile(userId: string, channel: string) {
     }
 
     // Campos variam levemente entre Instagram e Facebook
-    // Para Instagram Business, tentamos name e username
-    const fields = channel === 'instagram' ? 'name,username,profile_picture' : 'name,first_name,last_name,profile_pic';
+    // Para Instagram Business, tentamos name, username e profile_picture_url
+    const fields = channel === 'instagram' 
+      ? 'name,username,profile_picture_url' 
+      : 'name,first_name,last_name,profile_pic';
+      
     const response = await fetch(`https://graph.facebook.com/v19.0/${userId}?fields=${fields}&access_token=${token}`);
     
     if (response.ok) {
       const data = await response.json();
       return {
         name: data.name || data.username || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
-        avatar: data.profile_picture || data.profile_pic
+        avatar: data.profile_picture_url || data.profile_picture || data.profile_pic
       };
+    } else {
+      const errorData = await response.json();
+      console.error('Meta API Error:', JSON.stringify(errorData));
     }
   } catch (error) {
     console.error('Erro ao buscar perfil no Meta:', error);
