@@ -70,25 +70,10 @@ export async function POST(req: NextRequest) {
         const messageText = messaging.message.text;
         const channel = body.object === 'instagram' ? 'instagram' : 'facebook';
 
-        // 1. Verificar se já existe um ChatSession para este senderId
-        const deterministicId = `${channel}_${senderId}`;
-        let chatRef = doc(db, 'chats', deterministicId);
+        // 1. Identificador Único e Determinístico (Garante que nunca haverá duplicados)
+        const chatId = `${channel}_${senderId}`;
+        const chatRef = doc(db, 'chats', chatId);
         let chatSnap = await getDoc(chatRef);
-        let chatId = deterministicId;
-
-        // Se não encontrar pelo ID determinístico, tenta buscar por leadId (para compatibilidade com chats legados)
-        if (!chatSnap.exists()) {
-          const chatsRef = collection(db, 'chats');
-          const q = query(chatsRef, where('leadId', '==', senderId), where('channel', '==', channel));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const legacyDoc = querySnapshot.docs[0];
-            chatId = legacyDoc.id;
-            chatRef = doc(db, 'chats', chatId);
-            chatSnap = await getDoc(chatRef);
-          }
-        }
 
         let leadName = 'Lead via ' + (channel === 'instagram' ? 'Instagram' : 'Facebook');
         let leadAvatar = null;
@@ -96,57 +81,52 @@ export async function POST(req: NextRequest) {
         // Tentar buscar o nome e foto real do usuário no Meta
         const profile = await getMetaProfile(senderId, channel);
         if (profile) {
-          if (profile.name) leadName = profile.name;
-          if (profile.avatar) leadAvatar = profile.avatar;
+          leadName = profile.name || leadName;
+          leadAvatar = profile.avatar || leadAvatar;
         }
 
+        // 2. Criar ou Atualizar o Lead (Usando o senderId como chave única)
+        const leadId = senderId;
+        const leadRef = doc(db, 'leads', leadId);
+        const leadSnap = await getDoc(leadRef);
+
+        if (!leadSnap.exists()) {
+          const newLead: Partial<Lead> = {
+            nome: leadName,
+            origem: channel === 'instagram' ? 'Instagram Direct' : 'Facebook Messenger',
+            status: 'novo',
+            dataCriacao: new Date().toISOString(),
+            tags: ['omnichannel', channel],
+            avatar: leadAvatar,
+            isMetaLead: true
+          };
+          await setDoc(leadRef, newLead);
+        }
+
+        // 3. Garantir que o ChatSession exista (Usando o ID determinístico)
         if (!chatSnap.exists()) {
-          // Criar novo chat
-          const newChat: Partial<ChatSession> = {
-            leadId: senderId,
+          const newChat: ChatSession = {
+            id: chatId,
+            leadId: leadId,
             leadName: leadName,
-            leadAvatar: leadAvatar,
             channel: channel as any,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
             unreadCount: 1,
             status: 'active',
-            dataCriacao: new Date().toISOString()
+            avatar: leadAvatar
           };
           await setDoc(chatRef, newChat);
-
-          // Criar/Atualizar lead no CRM
-          const leadData: Lead = {
-            id: senderId, 
-            nome: leadName,
-            email: '',
-            celular: '',
-            origem: channel === 'instagram' ? 'Direct Instagram' : 'Messenger Facebook',
-            status: 'novo',
-            tags: ['omnichannel', channel],
-            dataCriacao: new Date().toISOString(),
-            consentimentoLGPD: true
-          };
-          await setDoc(doc(db, 'leads', senderId), leadData);
         } else {
-          // Atualizar chat existente
-          const chatData = chatSnap.data() as ChatSession;
-          
+          // Apenas atualizar a última mensagem e contador
           await updateDoc(chatRef, {
-            leadName: leadName,
-            leadAvatar: leadAvatar,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
-            unreadCount: (chatData.unreadCount || 0) + 1
+            unreadCount: (chatSnap.data()?.unreadCount || 0) + 1
           });
-
-          // Também atualizar o nome no Lead se ainda for o nome genérico
-          if (chatData.leadName.startsWith('Lead via')) {
-             await updateDoc(doc(db, 'leads', senderId), { nome: leadName });
-          }
         }
 
-        // 2. Salvar a mensagem
+        // 4. Salvar a mensagem
         const newMessage: Partial<ChatMessage> = {
           chatId: chatId,
           senderId: senderId,
