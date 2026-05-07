@@ -28,22 +28,31 @@ async function getMetaProfile(userId: string, channel: string) {
     if (!settingsSnap.exists()) return null;
     
     const settings = settingsSnap.data();
+    // Fallback: Tentar buscar na raiz ou dentro de omnichannel
     const token = channel === 'instagram' 
-      ? settings.omnichannel?.instagramAccessToken 
-      : settings.omnichannel?.messengerAccessToken;
+      ? (settings.omnichannel?.instagramAccessToken || settings.instagramAccessToken)
+      : (settings.omnichannel?.messengerAccessToken || settings.messengerAccessToken);
 
-    if (!token) return null;
+    if (!token) {
+      console.error('getMetaProfile: Token não encontrado para o canal', channel);
+      return null;
+    }
 
     // Campos variam levemente entre Instagram e Facebook
-    const fields = channel === 'instagram' ? 'name,profile_picture' : 'first_name,last_name,profile_pic';
+    // Para Instagram Business, 'name' e 'profile_picture' são os campos padrão
+    const fields = channel === 'instagram' ? 'name,profile_picture' : 'name,first_name,last_name,profile_pic';
     const response = await fetch(`https://graph.facebook.com/v19.0/${userId}?fields=${fields}&access_token=${token}`);
     
     if (response.ok) {
       const data = await response.json();
+      console.log('Dados do perfil Meta recebidos:', data);
       return {
         name: data.name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
         avatar: data.profile_picture || data.profile_pic
       };
+    } else {
+      const errorData = await response.json();
+      console.error('Erro na resposta da API Meta:', errorData);
     }
   } catch (error) {
     console.error('Erro ao buscar perfil no Meta:', error);
