@@ -70,14 +70,15 @@ export async function POST(req: NextRequest) {
       const messaging = entry?.messaging?.[0];
 
       if (messaging && messaging.message) {
-        const senderId = messaging.sender.id; // ID do usuário no Instagram/FB
-        const recipientId = messaging.recipient.id; // ID da sua página/conta
-        const messageText = messaging.message.text;
-        // Determinar se é Instagram ou Facebook pelo objeto da requisição
+        const isEcho = messaging.message.is_echo;
+        // Se for eco (mensagem enviada por nós), o ID do lead está no recipient
+        // Se não for eco (mensagem enviada pelo lead), o ID do lead está no sender
+        const leadId = isEcho ? messaging.recipient.id : messaging.sender.id;
+        const messageText = messaging.message.text || '';
         const channel = body.object === 'instagram' ? 'instagram' : 'facebook';
 
         // 1. Identificador Único e Determinístico (Garante que nunca haverá duplicados)
-        const chatId = `${channel}_${senderId}`;
+        const chatId = `${channel}_${leadId}`;
         const chatRef = doc(db, 'atendimentos_v3', chatId);
         let chatSnap = await getDoc(chatRef);
 
@@ -85,14 +86,13 @@ export async function POST(req: NextRequest) {
         let leadAvatar = null;
 
         // Tentar buscar o nome e foto real do usuário no Meta
-        const profile = await getMetaProfile(senderId, channel);
+        const profile = await getMetaProfile(leadId, channel);
         if (profile) {
           leadName = profile.name || leadName;
           leadAvatar = profile.avatar || leadAvatar;
         }
 
-        // 2. Criar ou Atualizar o Lead (Usando o senderId como chave única)
-        const leadId = senderId;
+        // 2. Criar ou Atualizar o Lead (Usando o leadId como chave única)
         const leadRef = doc(db, 'leads', leadId);
         const leadSnap = await getDoc(leadRef);
 
