@@ -36,6 +36,7 @@ const renderSocialIcon = (platform: string, size: number = 24, color?: string) =
 import { ChatSession, ChatMessage, Lead } from '@/types/crm';
 import { api } from '@/services/api';
 import { db, storage } from '@/lib/firebase';
+import { sendMetaMessageAction } from '@/app/actions/chat';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -153,11 +154,25 @@ export default function AtendimentoPage() {
 
     setNewMessage('');
     await api.sendMessage(msg);
+
+    // Enviar para o Meta (Facebook/Instagram)
+    if (selectedChat?.channel) {
+      const result = await sendMetaMessageAction(
+        selectedChat.id, // O ID do chat é o senderId do Meta
+        selectedChat.channel,
+        newMessage
+      );
+
+      if (!result.success) {
+        console.error('Erro ao enviar para Meta:', result.error);
+        alert(`A mensagem foi salva no CRM, mas não pôde ser entregue ao ${selectedChat.channel}: ${result.error}`);
+      }
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedChatId) return;
+    if (!file || !selectedChatId || !selectedChat) return;
 
     try {
       setUploading(true);
@@ -178,6 +193,15 @@ export default function AtendimentoPage() {
       };
 
       await api.sendMessage(msg);
+
+      // Enviar link da imagem para o Meta
+      if (selectedChat.channel) {
+        await sendMetaMessageAction(
+          selectedChat.id,
+          selectedChat.channel,
+          `Arquivo enviado: ${url}`
+        );
+      }
     } catch (error) {
       console.error('Erro no upload:', error);
       alert('Erro ao enviar arquivo.');
