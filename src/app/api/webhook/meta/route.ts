@@ -39,14 +39,14 @@ async function getMetaProfile(userId: string, channel: string) {
     }
 
     // Campos variam levemente entre Instagram e Facebook
-    // Para Instagram Business, 'name' e 'profile_picture' são os campos padrão
-    const fields = channel === 'instagram' ? 'name,profile_picture' : 'name,first_name,last_name,profile_pic';
+    // Para Instagram Business, tentamos name e username
+    const fields = channel === 'instagram' ? 'name,username,profile_picture' : 'name,first_name,last_name,profile_pic';
     const response = await fetch(`https://graph.facebook.com/v19.0/${userId}?fields=${fields}&access_token=${token}`);
     
     if (response.ok) {
       const data = await response.json();
       return {
-        name: data.name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
+        name: data.name || data.username || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
         avatar: data.profile_picture || data.profile_pic
       };
     }
@@ -123,12 +123,24 @@ export async function POST(req: NextRequest) {
           };
           await setDoc(chatRef, newChat);
         } else {
-          // Apenas atualizar a última mensagem e contador
-          await updateDoc(chatRef, {
+          // Atualizar última mensagem e tentar atualizar nome/avatar se forem genéricos
+          const chatData = chatSnap.data();
+          const updateData: any = {
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
-            unreadCount: (chatSnap.data()?.unreadCount || 0) + 1
-          });
+            unreadCount: (chatData?.unreadCount || 0) + 1
+          };
+
+          if (profile) {
+            if (!chatData?.leadName || chatData.leadName.startsWith('Lead via')) {
+              updateData.leadName = profile.name || chatData?.leadName;
+            }
+            if (!chatData?.avatar) {
+              updateData.avatar = profile.avatar || chatData?.avatar;
+            }
+          }
+
+          await updateDoc(chatRef, updateData);
         }
 
         // 4. Salvar a mensagem
