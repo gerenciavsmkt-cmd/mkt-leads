@@ -156,9 +156,14 @@ export default function LeadsPage() {
       title: 'Excluir Lead',
       message: 'Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.',
       onResolve: async () => {
-        await api.deleteLead(id);
-        await refreshLeads();
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          await api.deleteLead(id);
+          await refreshLeads();
+        } catch (error) {
+          alert('Não foi possível excluir o lead. Verifique sua conexão ou permissões.');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
     });
   };
