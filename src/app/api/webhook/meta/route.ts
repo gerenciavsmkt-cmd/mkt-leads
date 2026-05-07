@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
             channel: channel as any,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
-            unreadCount: 1,
+            unreadCount: isEcho ? 0 : 1,
             status: 'active',
             avatar: leadAvatar
           };
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
           const updateData: any = {
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
-            unreadCount: (chatData?.unreadCount || 0) + 1
+            unreadCount: isEcho ? 0 : (chatData?.unreadCount || 0) + 1
           };
 
           if (profile) {
