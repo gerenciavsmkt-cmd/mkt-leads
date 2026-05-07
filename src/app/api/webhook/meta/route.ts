@@ -55,6 +55,16 @@ async function getMetaProfile(userId: string, channel: string) {
     } else {
       const errorData = await response.json();
       console.error('Meta API Error:', JSON.stringify(errorData));
+      
+      // Salvar erro no banco para podermos debugar sem acesso ao terminal
+      try {
+        await setDoc(doc(db, 'settings', 'meta_debug'), {
+          lastError: errorData,
+          timestamp: new Date().toISOString(),
+          userIdAttempted: userId,
+          channel: channel
+        });
+      } catch(e) {}
     }
   } catch (error) {
     console.error('Erro ao buscar perfil no Meta:', error);
