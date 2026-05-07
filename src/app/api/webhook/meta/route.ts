@@ -45,14 +45,10 @@ async function getMetaProfile(userId: string, channel: string) {
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Dados do perfil Meta recebidos:', data);
       return {
         name: data.name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
         avatar: data.profile_picture || data.profile_pic
       };
-    } else {
-      const errorData = await response.json();
-      console.error('Erro na resposta da API Meta:', errorData);
     }
   } catch (error) {
     console.error('Erro ao buscar perfil no Meta:', error);
