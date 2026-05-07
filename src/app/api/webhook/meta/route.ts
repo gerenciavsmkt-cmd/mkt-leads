@@ -39,9 +39,9 @@ async function getMetaProfile(userId: string, channel: string) {
     }
 
     // Campos variam levemente entre Instagram e Facebook
-    // Para Instagram Business, tentamos name, username e profile_picture_url
+    // Para Instagram Business, tentamos name e profile_pic
     const fields = channel === 'instagram' 
-      ? 'name,username,profile_picture_url' 
+      ? 'name,profile_pic' 
       : 'name,first_name,last_name,profile_pic';
       
     const response = await fetch(`https://graph.facebook.com/v19.0/${userId}?fields=${fields}&access_token=${token}`);
