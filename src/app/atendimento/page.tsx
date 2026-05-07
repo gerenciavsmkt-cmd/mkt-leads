@@ -16,7 +16,8 @@ import {
   ExternalLink,
   ChevronLeft,
   X,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from 'lucide-react';
 
 const renderSocialIcon = (platform: string, size: number = 24, color?: string) => {
@@ -34,8 +35,9 @@ const renderSocialIcon = (platform: string, size: number = 24, color?: string) =
 };
 import { ChatSession, ChatMessage, Lead } from '@/types/crm';
 import { api } from '@/services/api';
-import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function AtendimentoPage() {
   const [chats, setChats] = useState<ChatSession[]>([]);
@@ -46,7 +48,14 @@ export default function AtendimentoPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showLeadDetails, setShowLeadDetails] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+
+  const EMOJIS = ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😻', '😼', '😽', '🙀', '😿', '😾'];
 
   // Listener para as sessões de chat
   useEffect(() => {
@@ -69,32 +78,59 @@ export default function AtendimentoPage() {
 
     const q = query(
       collection(db, 'messages'),
-      where('chatId', '==', selectedChatId),
-      orderBy('timestamp', 'asc')
+      where('chatId', '==', selectedChatId)
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const msgList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
+      
+      // Ordenar manualmente para evitar erro de índice no Firestore
+      msgList.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
       setMessages(msgList);
       
       // Marcar como lido
       api.markChatAsRead(selectedChatId);
+    }, (error) => {
+      console.error("Erro ao carregar mensagens:", error);
     });
 
     // Carregar dados do lead
     const chat = chats.find(c => c.id === selectedChatId);
     if (chat) {
-       getDoc(doc(db, 'leads', chat.leadId)).then(snap => {
-         if (snap.exists()) setSelectedLead({ id: snap.id, ...snap.data() } as Lead);
+       // Buscar lead pelo campo 'id' (que contém o ID da plataforma) ou ID do documento
+       const leadRef = collection(db, 'leads');
+       const qLead = query(leadRef, where('id', '==', chat.leadId));
+       getDocs(qLead).then(snap => {
+         if (!snap.empty) {
+           const leadDoc = snap.docs[0];
+           setSelectedLead({ id: leadDoc.id, ...leadDoc.data() } as Lead);
+         } else {
+           // Tentar buscar pelo ID do documento caso tenha sido salvo assim
+           getDoc(doc(db, 'leads', chat.leadId)).then(docSnap => {
+             if (docSnap.exists()) setSelectedLead({ id: docSnap.id, ...docSnap.data() } as Lead);
+           });
+         }
        });
     }
 
     return () => unsubscribe();
-  }, [selectedChatId]);
+  }, [selectedChatId, chats.length]); // Adicionado chats.length para reagir a mudanças na lista de chats
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Fechar menus ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(event.target as Node)) {
+        setShowChatMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +155,52 @@ export default function AtendimentoPage() {
     await api.sendMessage(msg);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChatId) return;
+
+    try {
+      setUploading(true);
+      const fileRef = ref(storage, `chats/${selectedChatId}/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+
+      const msg: ChatMessage = {
+        id: Math.random().toString(36).substr(2, 9),
+        chatId: selectedChatId,
+        senderId: 'atendente_admin',
+        senderName: 'Atendente',
+        content: url,
+        timestamp: new Date().toISOString(),
+        type: file.type.startsWith('image/') ? 'image' : 'file',
+        status: 'sent',
+        isIncoming: false
+      };
+
+      await api.sendMessage(msg);
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert('Erro ao enviar arquivo.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleArchiveChat = async () => {
+    if (!selectedChatId) return;
+    await updateDoc(doc(db, 'chats', selectedChatId), { status: 'archived' });
+    setSelectedChatId(null);
+    setShowChatMenu(false);
+  };
+
+  const handleDeleteChat = async () => {
+    if (!selectedChatId || !confirm('Tem certeza que deseja excluir esta conversa permanentemente?')) return;
+    await deleteDoc(doc(db, 'chats', selectedChatId));
+    setSelectedChatId(null);
+    setShowChatMenu(false);
+  };
+
   const getChannelIcon = (channel: string, size = 16) => {
     if (['instagram', 'facebook', 'whatsapp'].includes(channel)) {
       return renderSocialIcon(channel, size);
@@ -132,7 +214,13 @@ export default function AtendimentoPage() {
   );
 
   return (
-    <div style={{ height: 'calc(100vh - 4rem)', margin: '-1.5rem', display: 'flex', overflow: 'hidden', background: '#f1f5f9' }}>
+    <div style={{ 
+      height: 'calc(100vh - 4rem)', 
+      margin: '-1.5rem', 
+      display: 'flex', 
+      overflow: 'hidden', 
+      background: '#f1f5f9'
+    }}>
       
       {/* SIDEBAR DE CONVERSAS */}
       <div style={{ width: '350px', background: 'white', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
@@ -229,14 +317,55 @@ export default function AtendimentoPage() {
                 >
                   <Filter size={18} />
                 </button>
-                <button style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>
-                  <MoreVertical size={18} />
-                </button>
+                <div style={{ position: 'relative' }} ref={chatMenuRef}>
+                  <button 
+                    onClick={() => setShowChatMenu(!showChatMenu)}
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}
+                  >
+                    <MoreVertical size={18} />
+                  </button>
+                  {showChatMenu && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      top: '100%', 
+                      right: 0, 
+                      marginTop: '0.5rem', 
+                      background: 'white', 
+                      borderRadius: '12px', 
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+                      border: '1px solid #e2e8f0',
+                      zIndex: 100,
+                      width: '180px',
+                      overflow: 'hidden'
+                    }}>
+                      <button 
+                        onClick={handleArchiveChat}
+                        style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <Clock size={14} /> Arquivar Conversa
+                      </button>
+                      <button 
+                        onClick={handleDeleteChat}
+                        style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <Trash2 size={14} /> Excluir Conversa
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </header>
 
             {/* Mensagens */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              padding: '2rem', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '1rem',
+              minHeight: 0 // Importante para o flex-grow com scroll
+            }} className="custom-scrollbar">
               {messages.length === 0 && (
                 <div style={{ textAlign: 'center', margin: '2rem 0', opacity: 0.4 }}>
                   <p style={{ fontSize: '0.875rem' }}>Início da conversa</p>
@@ -263,19 +392,33 @@ export default function AtendimentoPage() {
                     )}
                     <div 
                       style={{ 
-                        padding: '0.75rem 1rem', 
+                        padding: msg.type === 'image' ? '4px' : '0.75rem 1rem', 
                         borderRadius: msg.isIncoming ? '18px 18px 18px 4px' : '18px 18px 4px 18px',
                         background: msg.isIncoming ? 'white' : 'var(--primary)',
                         color: msg.isIncoming ? '#1e293b' : 'white',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                         fontSize: '0.9rem',
                         lineHeight: 1.5,
-                        position: 'relative'
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}
                     >
-                      {msg.content}
+                      {msg.type === 'image' ? (
+                        <img 
+                          src={msg.content} 
+                          alt="Attachment" 
+                          style={{ maxWidth: '100%', maxHeight: '300px', display: 'block', borderRadius: '12px', cursor: 'pointer' }} 
+                          onClick={() => window.open(msg.content, '_blank')}
+                        />
+                      ) : msg.type === 'file' ? (
+                        <a href={msg.content} target="_blank" style={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+                          <Paperclip size={16} /> <span>Documento</span>
+                        </a>
+                      ) : (
+                        msg.content
+                      )}
                       {!msg.isIncoming && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px', paddingRight: msg.type === 'image' ? '8px' : 0 }}>
                           <CheckCheck size={14} style={{ opacity: 0.7 }} />
                         </div>
                       )}
@@ -289,9 +432,63 @@ export default function AtendimentoPage() {
             {/* Input de Mensagem */}
             <footer style={{ padding: '1.5rem', background: 'white', borderTop: '1px solid #e2e8f0' }}>
               <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="button" style={{ color: '#64748b', padding: '0.5rem' }}><Smile size={22} /></button>
-                  <button type="button" style={{ color: '#64748b', padding: '0.5rem' }}><Paperclip size={22} /></button>
+                <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    style={{ color: showEmojiPicker ? 'var(--primary)' : '#64748b', padding: '0.5rem', cursor: 'pointer' }}
+                  >
+                    <Smile size={22} />
+                  </button>
+                  {showEmojiPicker && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      bottom: '100%', 
+                      left: 0, 
+                      marginBottom: '1rem', 
+                      background: 'white', 
+                      borderRadius: '16px', 
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.15)', 
+                      border: '1px solid #e2e8f0', 
+                      padding: '1rem', 
+                      width: '320px', 
+                      height: '250px', 
+                      overflowY: 'auto',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(8, 1fr)',
+                      gap: '5px',
+                      zIndex: 100
+                    }}>
+                      {EMOJIS.map(emoji => (
+                        <button 
+                          key={emoji} 
+                          type="button" 
+                          onClick={() => {
+                            setNewMessage(prev => prev + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                          style={{ fontSize: '1.25rem', padding: '5px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '8px' }}
+                          className="hover-bg"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    style={{ display: 'none' }} 
+                    onChange={handleFileUpload} 
+                  />
+                  <button 
+                    type="button" 
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ color: uploading ? 'var(--primary)' : '#64748b', padding: '0.5rem', cursor: 'pointer' }}
+                  >
+                    <Paperclip size={22} />
+                  </button>
                 </div>
                 <input 
                   type="text" 
@@ -404,6 +601,22 @@ export default function AtendimentoPage() {
         @keyframes slideInRight {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+        .hover-bg:hover {
+          background-color: #f1f5f9 !important;
         }
       `}</style>
     </div>

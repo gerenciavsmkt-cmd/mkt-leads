@@ -470,15 +470,16 @@ export const api = {
   getMessages: async (chatId: string): Promise<ChatMessage[]> => {
     const q = query(
       collection(db, COLLECTIONS.MESSAGES),
-      where("chatId", "==", chatId),
-      orderBy("timestamp", "asc")
+      where("chatId", "==", chatId)
     );
     const querySnapshot = await getDocs(q);
     const messages: ChatMessage[] = [];
     querySnapshot.forEach((doc) => {
       messages.push({ id: doc.id, ...doc.data() } as ChatMessage);
     });
-    return messages;
+    
+    // Ordenar manualmente para evitar a necessidade de criar índices compostos no Firestore
+    return messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   },
 
   sendMessage: async (message: ChatMessage) => {

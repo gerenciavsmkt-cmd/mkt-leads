@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, setDoc } from 'firebase/firestore';
 import { ChatMessage, ChatSession, Lead } from '@/types/crm';
 
 // O Meta envia um desafio GET para verificar o webhook na configuração inicial
@@ -18,6 +18,37 @@ export async function GET(req: NextRequest) {
   }
 
   return new NextResponse('Forbidden', { status: 403 });
+}
+
+// Função auxiliar para buscar o perfil do usuário no Meta (Nome e Foto)
+async function getMetaProfile(userId: string, channel: string) {
+  try {
+    // Buscar tokens nas configurações globais
+    const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+    if (!settingsSnap.exists()) return null;
+    
+    const settings = settingsSnap.data();
+    const token = channel === 'instagram' 
+      ? settings.omnichannel?.instagramAccessToken 
+      : settings.omnichannel?.messengerAccessToken;
+
+    if (!token) return null;
+
+    // Campos variam levemente entre Instagram e Facebook
+    const fields = channel === 'instagram' ? 'name,profile_picture' : 'first_name,last_name,profile_pic';
+    const response = await fetch(`https://graph.facebook.com/v19.0/${userId}?fields=${fields}&access_token=${token}`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        name: data.name || (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : null),
+        avatar: data.profile_picture || data.profile_pic
+      };
+    }
+  } catch (error) {
+    console.error('Erro ao buscar perfil no Meta:', error);
+  }
+  return null;
 }
 
 // Recebe as notificações de mensagens reais via POST
@@ -46,12 +77,21 @@ export async function POST(req: NextRequest) {
 
         let chatId = '';
         let leadName = 'Lead via ' + (channel === 'instagram' ? 'Instagram' : 'Facebook');
+        let leadAvatar = null;
+
+        // Tentar buscar o nome e foto real do usuário no Meta
+        const profile = await getMetaProfile(senderId, channel);
+        if (profile) {
+          if (profile.name) leadName = profile.name;
+          if (profile.avatar) leadAvatar = profile.avatar;
+        }
 
         if (querySnapshot.empty) {
           // Criar novo chat e possivelmente novo lead
           const newChat: Partial<ChatSession> = {
             leadId: senderId,
             leadName: leadName,
+            leadAvatar: leadAvatar,
             channel: channel as any,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
@@ -62,9 +102,9 @@ export async function POST(req: NextRequest) {
           const docRef = await addDoc(chatsRef, newChat);
           chatId = docRef.id;
 
-          // Criar lead no CRM também
-          await addDoc(collection(db, 'leads'), {
-            id: senderId, // Usamos o ID da plataforma como referência
+          // Criar/Atualizar lead no CRM
+          const leadData: Lead = {
+            id: senderId, 
             nome: leadName,
             email: '',
             celular: '',
@@ -73,7 +113,10 @@ export async function POST(req: NextRequest) {
             tags: ['omnichannel', channel],
             dataCriacao: new Date().toISOString(),
             consentimentoLGPD: true
-          });
+          };
+          
+          // Usar setDoc com o ID da plataforma para evitar duplicados e facilitar busca
+          await setDoc(doc(db, 'leads', senderId), leadData);
         } else {
           // Atualizar chat existente
           const chatDoc = querySnapshot.docs[0];
@@ -81,10 +124,17 @@ export async function POST(req: NextRequest) {
           const chatData = chatDoc.data() as ChatSession;
           
           await updateDoc(doc(db, 'chats', chatId), {
+            leadName: leadName, // Atualizar caso o nome tenha sido obtido agora
+            leadAvatar: leadAvatar,
             lastMessage: messageText,
             lastTimestamp: new Date().toISOString(),
             unreadCount: (chatData.unreadCount || 0) + 1
           });
+
+          // Também atualizar o nome no Lead se ainda for o nome genérico
+          if (chatData.leadName.startsWith('Lead via')) {
+             await updateDoc(doc(db, 'leads', senderId), { nome: leadName });
+          }
         }
 
         // 2. Salvar a mensagem
