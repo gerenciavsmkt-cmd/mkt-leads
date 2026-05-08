@@ -25,7 +25,8 @@ import {
   MessageCircle,
   User,
   Mail,
-  Shield
+  Shield,
+  Eye
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -399,7 +400,11 @@ export default function MultiCapturaEditor() {
               </div>
 
               <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.875rem' }}>
-                <code style={{ color: 'var(--primary)' }}>/{page.slug}</code>
+                <code style={{ color: 'var(--primary)', display: 'block', marginBottom: '0.5rem' }}>/{page.slug}</code>
+                <div style={{ display: 'flex', gap: '1rem', color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Eye size={14} /> {page.visualizacoes || 0} visualizações</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><MousePointerClick size={14} /> {page.cliquesTotais || 0} capturas</span>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto' }}>

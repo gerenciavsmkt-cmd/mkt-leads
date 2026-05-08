@@ -109,6 +109,8 @@ export interface LandingPageInstance {
   config: LandingPageSettings;
   dataCriacao: string;
   isAtiva: boolean;
+  visualizacoes?: number;
+  cliquesTotais?: number;
 }
 
 export interface Settings {

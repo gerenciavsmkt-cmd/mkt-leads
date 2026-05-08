@@ -523,6 +523,7 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
       observacoes: observacoes
     };
     await api.saveLead(newLead);
+    api.incrementLandingPageClick(page.id).catch(err => console.error("Erro ao contar captura LP:", err));
 
     // Enviar e-mail de cupom se configurado
     if (page.templateId === 'coupon' && config.couponCode && config.sendCouponEmail && globalSettings?.brevoApiKey) {
@@ -699,6 +700,8 @@ export default function UnifiedClientPage({ slug, initialData }: { slug: string,
     // Se temos dados iniciais (Bio Link), incrementamos a view
     if (initialData?.type === 'bio' && initialData.content?.id) {
       api.incrementBioView(initialData.content.id).catch(err => console.error("Erro ao contar view inicial:", err));
+    } else if (initialData?.type === 'lp' && initialData.content?.id) {
+      api.incrementLandingPageView(initialData.content.id).catch(err => console.error("Erro ao contar view inicial LP:", err));
     }
 
     if (initialData) return;
@@ -707,6 +710,7 @@ export default function UnifiedClientPage({ slug, initialData }: { slug: string,
       const lp = await api.getLandingPageBySlug(slug);
       if (lp) {
         setData({ type: 'lp', content: lp });
+        api.incrementLandingPageView(lp.id).catch(err => console.error("Erro ao contar view carregada LP:", err));
         setLoading(false);
         return;
       }

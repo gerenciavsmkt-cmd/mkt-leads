@@ -209,6 +209,36 @@ export const api = {
     await deleteDoc(doc(db, COLLECTIONS.LANDING_PAGES, id));
   },
 
+  incrementLandingPageView: async (id: string) => {
+    try {
+      const pageRef = doc(db, COLLECTIONS.LANDING_PAGES, id);
+      const snap = await getDoc(pageRef);
+      if (snap.exists()) {
+        const data = snap.data() as LandingPageInstance;
+        await updateDoc(pageRef, {
+          visualizacoes: (data.visualizacoes || 0) + 1
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
+  incrementLandingPageClick: async (id: string) => {
+    try {
+      const pageRef = doc(db, COLLECTIONS.LANDING_PAGES, id);
+      const snap = await getDoc(pageRef);
+      if (snap.exists()) {
+        const data = snap.data() as LandingPageInstance;
+        await updateDoc(pageRef, {
+          cliquesTotais: (data.cliquesTotais || 0) + 1
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
   generateQueueForCampaign: async (campanhaId: string, leadIds: string[]) => {
     const allLeads = await api.getLeads();
     const leads = allLeads.filter(l => leadIds.includes(l.id));
