@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 export async function sendOmnichannelMessageAction(
   recipientIdOrPhone: string, 
@@ -38,12 +38,27 @@ export async function sendOmnichannelMessageAction(
 
     // 2. Lógica para WHATSAPP
     if (channel === 'whatsapp') {
-      if (!connectionId) {
-        return { success: false, error: 'ID da conexão WhatsApp não fornecido.' };
+      let targetConnectionId = connectionId;
+
+      // Se não temos um ID de conexão, ou se queremos garantir que usamos a principal
+      if (!targetConnectionId) {
+        const principalQuery = query(
+          collection(db, 'whatsapp_connections'), 
+          where('isPrincipal', '==', true),
+          limit(1)
+        );
+        const principalSnap = await getDocs(principalQuery);
+        if (!principalSnap.empty) {
+          targetConnectionId = principalSnap.docs[0].id;
+        }
+      }
+
+      if (!targetConnectionId) {
+        return { success: false, error: 'Nenhuma conexão WhatsApp (Principal ou Específica) encontrada.' };
       }
 
       // Buscar os detalhes da conexão específica
-      const connSnap = await getDoc(doc(db, 'whatsapp_connections', connectionId));
+      const connSnap = await getDoc(doc(db, 'whatsapp_connections', targetConnectionId));
       if (!connSnap.exists()) {
         return { success: false, error: 'Conexão WhatsApp não encontrada no sistema.' };
       }
@@ -95,6 +110,15 @@ export async function sendOmnichannelMessageAction(
 
         const evolutionReqUrl = `${apiUrl.replace(/\/$/, '')}/message/sendText/${instanceName}`;
         
+        const isLid = recipientIdOrPhone.includes('@lid') || (recipientIdOrPhone.length > 13 && !recipientIdOrPhone.startsWith('55'));
+        let cleanNumber = recipientIdOrPhone.replace(/[^\d@lid]/g, '');
+        
+        if (isLid && !cleanNumber.includes('@lid')) {
+          cleanNumber = cleanNumber.split('@')[0] + '@lid';
+        }
+        
+        console.log(`>>> Enviando para Evolution: ${cleanNumber} (LID: ${isLid})`);
+
         const response = await fetch(evolutionReqUrl, {
           method: 'POST',
           headers: {
@@ -102,20 +126,21 @@ export async function sendOmnichannelMessageAction(
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            number: recipientIdOrPhone,
+            number: cleanNumber,
+            text: text, // No v2 o texto é direto aqui
             options: {
               delay: 1200,
               presence: "composing",
               linkPreview: false
-            },
-            textMessage: {
-              text: text
             }
           })
         });
 
         const data = await response.json();
-        return response.ok ? { success: true, data } : { success: false, error: data.response?.message || 'Erro Evolution API' };
+        console.log('>>> Resposta do Docker:', JSON.stringify(data));
+        
+        return response.ok ? { success: true, data } : { success: false, error: data.error || 'Erro no Docker' };
+
       }
     }
 

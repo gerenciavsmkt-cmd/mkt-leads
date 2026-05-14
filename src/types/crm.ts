@@ -166,6 +166,7 @@ export interface Settings {
     enabled: boolean;
     message: string;
   };
+  gtmId?: string; // ID do Google Tag Manager
 }
 
 // --- LINK NA BIO ---

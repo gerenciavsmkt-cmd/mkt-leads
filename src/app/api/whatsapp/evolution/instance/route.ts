@@ -6,7 +6,12 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const connectionId = searchParams.get('connectionId');
-    const origin = req.nextUrl.origin;
+    let origin = req.nextUrl.origin;
+
+    // Se estiver rodando localmente, precisamos usar o host do Docker para o webhook
+    if (origin.includes('localhost')) {
+      origin = origin.replace('localhost', 'host.docker.internal');
+    }
 
     if (!connectionId) {
       return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });

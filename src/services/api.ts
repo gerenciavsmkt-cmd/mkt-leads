@@ -75,7 +75,8 @@ const initialSettings: Settings = {
     atendentes: [
       { id: '1', nome: 'Atendimento Comercial', cargo: 'Vendas', telefone: '554899999999', disponibilidade: '08:00 às 18:00' }
     ]
-  }
+  },
+  gtmId: ''
 };
 
 export const api = {
@@ -286,7 +287,8 @@ export const api = {
           faviconUrl: visualData.faviconUrl || settings.landingPage?.faviconUrl || '',
           backgroundUrl: visualData.backgroundUrl || settings.landingPage?.backgroundUrl || ''
         },
-        empresa: { ...initialSettings.empresa, ...(settings.empresa || {}) }
+        empresa: { ...initialSettings.empresa, ...(settings.empresa || {}) },
+        gtmId: settings.gtmId || ''
       };
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);

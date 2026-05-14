@@ -235,6 +235,39 @@ export default function ConfigPage() {
           </div>
         </section>
 
+        {/* GOOGLE TAG MANAGER */}
+        <section style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', paddingBottom: '3rem', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ flex: '1 1 300px', maxWidth: '350px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <Globe className="color-primary" size={20} />
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Google Tag Manager</h3>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
+              Integre suas páginas de captura com o GTM para monitorar conversões no Google Ads e Analytics.
+            </p>
+          </div>
+          
+          <div className="card" style={{ flex: '2 1 500px', margin: 0, display: 'grid', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>GTM ID</label>
+              <div style={{ position: 'relative' }}>
+                <Globe size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
+                <input 
+                   type="text" 
+                   className="btn-outline" 
+                   style={{ width: '100%', paddingLeft: '2.5rem', height: '42px' }} 
+                   placeholder="GTM-XXXXXXX"
+                   value={settings.gtmId || ''}
+                   onChange={e => setSettings({...settings, gtmId: e.target.value})}
+                />
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem' }}>
+                O script será carregado automaticamente em todas as suas landing pages e links da bio.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* INFORMAÇÕES DA EMPRESA (RODAPÉ) */}
         <section style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', paddingBottom: '3rem', borderBottom: '1px solid var(--border)' }}>
           <div style={{ flex: '1 1 300px', maxWidth: '350px' }}>

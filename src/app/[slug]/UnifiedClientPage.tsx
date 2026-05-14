@@ -392,6 +392,20 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
     e.preventDefault();
     const leadId = Math.random().toString(36).substr(2, 9);
     await api.saveLead({ id: leadId, nome: formData.nome, email: formData.email, celular: formData.telefone, origem: `WhatsApp (${pageSlug})`, consentimentoLGPD: true, status: 'novo', tags: ['whatsapp'], dataCriacao: new Date().toISOString() } as Lead);
+    
+    // GTM Event
+    if (typeof window !== 'undefined' && (window as any).dataLayer) {
+      (window as any).dataLayer.push({
+        event: 'whatsapp_click',
+        attendant_name: selectedAttendant.nome,
+        attendant_id: selectedAttendant.id,
+        page_source: pageSlug,
+        lead_name: formData.nome,
+        lead_email: formData.email,
+        lead_phone: formData.telefone
+      });
+    }
+
     const msg = encodeURIComponent(`Olá ${selectedAttendant.nome}, vim pelo site e gostaria de falar com você.`);
     window.open(`https://wa.me/${selectedAttendant.telefone.replace(/\D/g, '')}?text=${msg}`, '_blank');
     setOpen(false); setShowForm(false); setSelectedAttendant(null); setFormData({ nome: '', email: '', telefone: '' });
@@ -524,6 +538,16 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
     };
     await api.saveLead(newLead);
     api.incrementLandingPageClick(page.id).catch(err => console.error("Erro ao contar captura LP:", err));
+
+    // GTM Event
+    if (typeof window !== 'undefined' && (window as any).dataLayer) {
+      (window as any).dataLayer.push({
+        event: 'generate_lead',
+        lead_source: page.slug,
+        lead_type: page.templateId,
+        email: formData.email // Útil para Enhanced Conversions se o GTM estiver configurado para capturar
+      });
+    }
 
     // Enviar e-mail de cupom se configurado
     if (page.templateId === 'coupon' && config.couponCode && config.sendCouponEmail && globalSettings?.brevoApiKey) {

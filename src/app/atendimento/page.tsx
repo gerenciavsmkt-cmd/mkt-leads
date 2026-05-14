@@ -61,6 +61,7 @@ export default function AtendimentoPage() {
   const [showLeadDetails, setShowLeadDetails] = useState(true);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [connections, setConnections] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
@@ -76,6 +77,16 @@ export default function AtendimentoPage() {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Carregar conexões disponíveis
+  useEffect(() => {
+    const fetchConnections = async () => {
+      const snap = await getDocs(collection(db, 'whatsapp_connections'));
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setConnections(list);
+    };
+    fetchConnections();
   }, []);
 
   // Listener para as mensagens do chat selecionado
@@ -170,11 +181,17 @@ export default function AtendimentoPage() {
       await api.sendMessage(msg);
 
       if (['instagram', 'facebook', 'whatsapp'].includes(chat.channel)) {
-        // Meta e Instagram usam o leadId original do painel da Meta
-        // WhatsApp usa o celular do lead
-        const recipient = chat.channel === 'whatsapp' && selectedLead 
-          ? (selectedLead.celular || selectedLead.telefone || '').replace(/\D/g, '') 
-          : chat.leadId;
+        // Priorizar o leadId da sessão de chat se for WhatsApp, pois ele contém o número real que enviou a mensagem
+        let recipient = chat.leadId;
+
+        if (chat.channel === 'whatsapp') {
+          // Se o leadId não parecer um número, tenta o celular do cadastro
+          if (!/^\d+$/.test(chat.leadId.split('@')[0]) && selectedLead) {
+            recipient = (selectedLead.celular || selectedLead.telefone || chat.leadId).replace(/\D/g, '');
+          } else {
+            recipient = chat.leadId.split('@')[0];
+          }
+        }
 
         const result = await sendOmnichannelMessageAction(
           recipient, 
@@ -251,6 +268,15 @@ export default function AtendimentoPage() {
     await deleteDoc(doc(db, 'atendimentos_v3', selectedChatId));
     setSelectedChatId(null);
     setShowChatMenu(false);
+  };
+
+  const handleChangeChatConnection = async (connId: string) => {
+    if (!selectedChatId) return;
+    const conn = connections.find((c: any) => c.id === connId);
+    await updateDoc(doc(db, 'atendimentos_v3', selectedChatId), { 
+      connectionId: connId,
+      connectionName: conn?.name || conn?.evolutionInstanceName || 'WhatsApp'
+    });
   };
 
   const getChannelIcon = (channel: string, size = 16) => {
@@ -698,6 +724,25 @@ export default function AtendimentoPage() {
                   </div>
                 </div>
               </div>
+
+              {activeChat?.channel === 'whatsapp' && (
+                <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.4, display: 'block', marginBottom: '0.5rem' }}>Conexão de Resposta</label>
+                  <select 
+                    value={activeChat.connectionId || ''}
+                    onChange={(e) => handleChangeChatConnection(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                  >
+                    <option value="">Selecione uma conexão...</option>
+                    {connections.map(conn => (
+                      <option key={conn.id} value={conn.id}>
+                        {conn.name || conn.evolutionInstanceName} ({conn.type === 'evolution_api' ? 'Docker' : 'Meta'})
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: '0.65rem', marginTop: '0.5rem', opacity: 0.6 }}>Altere aqui para forçar o uso do Docker neste lead.</p>
+                </div>
+              )}
 
               {selectedLead && (
                 <div style={{ padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)' }}>

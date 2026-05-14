@@ -7,9 +7,20 @@ import { sendOmnichannelMessageAction } from '@/app/actions/chat';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Grava o payload completo para análise profunda
+    fs.writeFileSync(
+      path.join(process.cwd(), 'scratch', 'last_webhook_payload.json'), 
+      JSON.stringify(body, null, 2)
+    );
 
-    // Log para depuração
-    console.log('Webhook Evolution API recebido:', JSON.stringify(body, null, 2));
+    // LOG DE EMERGÊNCIA - PARA ANALISAR O LID
+    console.error('#################################################');
+    console.error('### NOVO WEBHOOK RECEBIDO DO EVOLUTION        ###');
+    console.error(JSON.stringify(body, null, 2));
+    console.error('#################################################');
 
     // A Evolution envia vários eventos, queremos focar em novas mensagens
     if (body.event === 'messages.upsert' || body.event === 'messages.update') {
@@ -21,42 +32,184 @@ export async function POST(req: NextRequest) {
         return new NextResponse('Missing message key', { status: 200 });
       }
 
-      // O remoteJid é o número do WhatsApp com o sufixo @s.whatsapp.net
-      // Ex: 554899999999@s.whatsapp.net (Pode ser também de grupo @g.us)
-      const remoteJid = data.key.remoteJid;
+      const isFromMe = data.key.fromMe;
       
-      // Ignorar mensagens de grupos temporariamente ou mensagens de sistema
+      // O remoteJid real da conversa está em data.key.remoteJid
+      let remoteJid = data.key.remoteJid;
+      
+      // Lógica para lidar com LIDs (WhatsApp novos/privacidade)
+      let phoneNumber = remoteJid.split('@')[0];
+      const isLid = remoteJid.includes('@lid');
+
+      // Se for @lid, tentamos resolver para o número real chamando a API da Evolution
+      if (isLid && !isFromMe) {
+        try {
+          const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+          const settings = settingsSnap.exists() ? settingsSnap.data() : null;
+          
+          // Usar configurações do banco ou fallback (o que funcionar no "Testar Envio")
+          const apiUrl = settings?.omnichannel?.evolutionApiUrl || 'http://localhost:8080';
+          const apiKey = settings?.omnichannel?.evolutionApiKey || '42247732-1594-42cc-9430-194165683244';
+
+          if (apiUrl && apiKey) {
+            const endpoints = [
+              `/chat/fetchContact/${instanceName}`,
+              `/chat/getContact/${instanceName}`,
+              `/chat/fetchProfile/${instanceName}`,
+              `/chat/whatsappNumbers/${instanceName}`,
+              `/chat/contactDetails/${instanceName}`,
+              `/chat/retrieveNumber/${instanceName}`
+            ];
+
+            let resolved = false;
+            // Tenta com o ID original (com @lid) e depois só com os números
+            const idsToTry = [remoteJid, remoteJid.split('@')[0]];
+
+            for (const idToTry of idsToTry) {
+              if (resolved) break;
+              for (const endpoint of endpoints) {
+                if (resolved) break;
+
+                const resolveUrl = `${apiUrl.replace(/\/$/, '')}${endpoint}`;
+                console.log(`Tentando resolver ${idToTry} em: ${resolveUrl}`);
+                
+                try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 3000);
+                  
+                  // Se for whatsappNumbers, tenta o formato de array
+                  const bodyData = endpoint.includes('whatsappNumbers') 
+                    ? { numbers: [idToTry] } 
+                    : { number: idToTry };
+
+                  const resolveRes = await fetch(resolveUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+                    body: JSON.stringify(bodyData),
+                    signal: controller.signal
+                  });
+                  clearTimeout(timeoutId);
+                  
+                  const resolveData = await resolveRes.json();
+                  // Log para debug
+                  if (endpoint.includes('whatsappNumbers')) {
+                    console.log('Resposta whatsappNumbers:', JSON.stringify(resolveData));
+                  }
+                  
+                  if (resolveRes.ok && resolveData) {
+                    // O whatsappNumbers costuma retornar um array
+                    const result = Array.isArray(resolveData) ? resolveData[0] : resolveData;
+                    const resNum = (result.number || result.jid || result.id || result.exists || '').toString().split('@')[0].replace(/\D/g, '');
+                    
+                    if (resNum && resNum.startsWith('55') && resNum.length >= 12) {
+                      console.log(`✅ LID RESOLVIDO via ${endpoint}: ${idToTry} -> ${resNum}`);
+                      phoneNumber = resNum;
+                      resolved = true;
+                    }
+                  }
+                } catch (e) {}
+              }
+            }
+
+            // Se ainda não resolveu, tenta o endpoint de Contatos
+            if (!resolved) {
+              console.log(`Tentando resolver via Contatos em: ${apiUrl}/contact/fetchContent/${instanceName}`);
+              try {
+                const contactUrl = `${apiUrl.replace(/\/$/, '')}/contact/fetchContent/${instanceName}`;
+                const contactRes = await fetch(contactUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+                  body: JSON.stringify({ number: remoteJid })
+                });
+                const contactData = await contactRes.json();
+                console.log('Resposta Contatos:', JSON.stringify(contactData));
+                if (contactData && contactData.number && !contactData.number.includes('lid')) {
+                  phoneNumber = contactData.number.split('@')[0];
+                  console.log(`✅ LID RESOLVIDO via Contatos: ${remoteJid} -> ${phoneNumber}`);
+                  resolved = true;
+                }
+              } catch (e) {
+                console.log('Erro ao buscar no diretório de contatos.');
+              }
+            }
+
+            // Se nada resolveu, tenta buscar na lista global de contatos da instância
+            if (!resolved) {
+              try {
+                console.log('Buscando na lista global de contatos da instância...');
+                const contactsUrl = `${apiUrl.replace(/\/$/, '')}/instance/fetchContacts/${instanceName}`;
+                const contactsRes = await fetch(contactsUrl, {
+                  method: 'GET',
+                  headers: { 'apikey': apiKey }
+                });
+                const contacts = await contactsRes.json();
+                
+                if (Array.isArray(contacts)) {
+                  const matchedContact = contacts.find(c => 
+                    c.id === remoteJid || 
+                    c.jid === remoteJid || 
+                    (c.id && c.id.includes(remoteJid.split('@')[0]))
+                  );
+                  
+                  if (matchedContact) {
+                    const realId = matchedContact.id || matchedContact.jid;
+                    const realNum = realId.split('@')[0];
+                    if (realNum && !realNum.includes('lid')) {
+                      console.log(`✅ LID RESOLVIDO via Agenda Global: ${remoteJid} -> ${realNum}`);
+                      phoneNumber = realNum;
+                      resolved = true;
+                    }
+                  }
+                }
+              } catch (e) {
+                console.log('Erro ao buscar na agenda global.');
+              }
+            }
+          }
+ else {
+            console.error('❌ URL ou API Key da Evolution não configuradas para resolução de LID.');
+          }
+        } catch (err) {
+          console.error('Erro ao resolver LID para número real:', err);
+        }
+      }
+
+      // Ignorar mensagens de grupos ou sistema
       if (remoteJid.includes('@g.us') || remoteJid === 'status@broadcast') {
         return new NextResponse('Ignored', { status: 200 });
       }
 
-      const isFromMe = data.key.fromMe;
       const pushName = data.pushName || 'Desconhecido';
       
-      // Extrair o texto da mensagem (A estrutura da Evolution/Baileys é complexa)
+      // Extrair o texto da mensagem (A estrutura da Evolution/Baileys varia entre versões)
       const messageObj = data.message;
       let messageText = '';
       let messageType: 'text' | 'image' | 'video' | 'file' = 'text';
       
       if (messageObj) {
-        if (messageObj.conversation) {
-          messageText = messageObj.conversation;
-        } else if (messageObj.extendedTextMessage?.text) {
-          messageText = messageObj.extendedTextMessage.text;
-        } else if (messageObj.imageMessage) {
+        // Tenta encontrar o texto em diferentes níveis (v1.x vs v2.x)
+        const msg = messageObj.message || messageObj;
+        
+        if (msg.conversation) {
+          messageText = msg.conversation;
+        } else if (msg.extendedTextMessage?.text) {
+          messageText = msg.extendedTextMessage.text;
+        } else if (msg.imageMessage) {
           messageType = 'image';
-          messageText = messageObj.imageMessage.caption || '📷 Imagem';
-        } else if (messageObj.videoMessage) {
+          messageText = msg.imageMessage.caption || '📷 Imagem';
+        } else if (msg.videoMessage) {
           messageType = 'video';
-          messageText = messageObj.videoMessage.caption || '🎥 Vídeo';
-        } else if (messageObj.documentMessage) {
+          messageText = msg.videoMessage.caption || '🎥 Vídeo';
+        } else if (msg.documentMessage) {
           messageType = 'file';
-          messageText = messageObj.documentMessage.fileName || '📄 Documento';
-        } else if (messageObj.audioMessage) {
+          messageText = msg.documentMessage.fileName || '📄 Documento';
+        } else if (msg.audioMessage) {
           messageType = 'file';
           messageText = '🎵 Áudio';
+        } else if (typeof msg === 'string') {
+          messageText = msg;
         } else {
-           messageText = 'Mensagem não suportada';
+          messageText = 'Mensagem de mídia ou sistema';
         }
       }
 
@@ -67,22 +220,22 @@ export async function POST(req: NextRequest) {
 
       // 1. Buscar a conexão que recebeu essa mensagem
       const connectionsRef = collection(db, 'whatsapp_connections');
+      const connSnap = await getDocs(connectionsRef);
+      
+      console.log('--- Conexões encontradas no banco ---');
+      connSnap.forEach(d => console.log(`- ${d.data().name}: Key=${d.data().evolutionApiKey}`));
+
       const qConn = query(connectionsRef, where('evolutionInstanceName', '==', instanceName));
-      const connSnap = await getDocs(qConn);
+      const connSnapSpecific = await getDocs(qConn);
       
       let connectionId = '';
       let connectionName = 'WhatsApp';
       
-      if (!connSnap.empty) {
-        const connDoc = connSnap.docs[0];
+      if (!connSnapSpecific.empty) {
+        const connDoc = connSnapSpecific.docs[0];
         connectionId = connDoc.id;
         connectionName = connDoc.data().name;
-      } else {
-        console.warn(`Conexão Evolution não encontrada para a instância: ${instanceName}`);
       }
-
-      // 2. Extrair o telefone limpo do JID
-      const phoneNumber = remoteJid.split('@')[0];
 
       // 3. Procurar se já existe um Lead com esse telefone
       const leadsRef = collection(db, 'leads');

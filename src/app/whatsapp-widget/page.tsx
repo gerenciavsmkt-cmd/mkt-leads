@@ -57,6 +57,19 @@ export default function WhatsappWidgetStandalone() {
       dataCriacao: new Date().toISOString()
     } as Lead);
 
+    // GTM Event
+    if (typeof window !== 'undefined' && (window as any).dataLayer) {
+      (window as any).dataLayer.push({
+        event: 'whatsapp_click',
+        attendant_name: selectedAttendant.nome,
+        attendant_id: selectedAttendant.id,
+        page_source: 'external_widget',
+        lead_name: formData.nome,
+        lead_email: formData.email,
+        lead_phone: formData.telefone
+      });
+    }
+
     const msg = encodeURIComponent(`Olá ${selectedAttendant.nome}, vim pelo seu site e gostaria de falar com você.`);
     window.open(`https://wa.me/${selectedAttendant.telefone.replace(/\D/g, '')}?text=${msg}`, '_blank');
     

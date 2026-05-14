@@ -1,0 +1,57 @@
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    restart: always
+    environment:
+      - SERVER_TYPE=http
+      - SERVER_PORT=8080
+      - PORT=8080
+      - LOG_LEVEL=ERROR,WARN,DEBUG,INFO
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=42247732-1594-42cc-9430-194165683244
+      
+      # Configurações de Banco de Dados (v2)
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:evolution@db:5432/evolution?sslmode=disable
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_crm
+      
+      # Configurações de Cache (Redis)
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      
+      # Configurações de Tradução de LID e Contatos
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - DATABASE_SAVE_DATA_LABELS=true
+      - DATABASE_SAVE_DATA_MESSAGES=true
+      - DATABASE_SAVE_MESSAGE_STATUS=true
+      
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./evolution_data:/evolution/instances
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=evolution
+      - POSTGRES_DB=evolution
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data

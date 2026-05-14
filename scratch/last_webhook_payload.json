@@ -1,0 +1,17 @@
+{
+  "event": "presence.update",
+  "instance": "atendimento",
+  "data": {
+    "id": "140467542966417@lid",
+    "presences": {
+      "140467542966417@lid": {
+        "lastKnownPresence": "available"
+      }
+    }
+  },
+  "destination": "http://host.docker.internal:3000/api/webhook/evolution",
+  "date_time": "2026-05-12T10:51:20.439Z",
+  "sender": "554884040762@s.whatsapp.net",
+  "server_url": "http://localhost:8080",
+  "apikey": "Apikey not found"
+}

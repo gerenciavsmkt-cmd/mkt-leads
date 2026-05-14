@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Conectar WhatsApp - Gerency Leads</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f0f2f5; }
+        .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        #qrcode { margin: 20px 0; min-height: 250px; display: flex; align-items: center; justify-content: center; }
+        img { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+        .btn { background: #25d366; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .status { margin-top: 10px; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Conectar WhatsApp</h1>
+        <p>Escaneie o código abaixo com o seu celular:</p>
+        <div id="qrcode">Carregando...</div>
+        <button class="btn" onclick="getQRCode()">Atualizar QR Code</button>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        const apiKey = '42247732-1594-42cc-9430-194165683244';
+        const instanceName = 'GerencyLeads_Main';
+
+        async function getQRCode() {
+            const qrcodeDiv = document.getElementById('qrcode');
+            const statusDiv = document.getElementById('status');
+            qrcodeDiv.innerHTML = 'Carregando...';
+            
+            try {
+                const response = await fetch(`http://localhost:8080/instance/connect/${instanceName}`, {
+                    headers: { 'apikey': apiKey }
+                });
+                const data = await response.json();
+                
+                if (data.status === 200 && data.response && data.response.base64) {
+                    qrcodeDiv.innerHTML = `<img src="${data.response.base64}" alt="QR Code WhatsApp">`;
+                    statusDiv.innerText = 'QR Code gerado com sucesso!';
+                } else if (data.status === 403) {
+                    qrcodeDiv.innerHTML = '<p style="color:red">Erro 403: Verifique a API Key no docker-compose.yml</p>';
+                } else {
+                    qrcodeDiv.innerHTML = '<p style="color:orange">Aguardando o WhatsApp gerar o código... clique em atualizar.</p>';
+                }
+            } catch (err) {
+                qrcodeDiv.innerHTML = '<p style="color:red">Erro ao conectar com a API. O Docker está rodando?</p>';
+                console.error(err);
+            }
+        }
+
+        getQRCode();
+        setInterval(getQRCode, 30000); // Atualiza a cada 30s
+    </script>
+</body>
+</html>
