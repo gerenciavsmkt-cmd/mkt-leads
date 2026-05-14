@@ -709,6 +709,14 @@ export default function LeadsPage() {
                     <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Data de Cadastro</p>
                     <p style={{ fontWeight: 500 }}>{new Date(viewingLead.dataCriacao).toLocaleString('pt-BR')}</p>
                   </div>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Total de Conversões</p>
+                    <p style={{ fontWeight: 600, color: 'var(--primary)' }}>{viewingLead.totalConversoes || 1}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Última Conversão</p>
+                    <p style={{ fontWeight: 500 }}>{viewingLead.dataUltimaConversao ? new Date(viewingLead.dataUltimaConversao).toLocaleString('pt-BR') : new Date(viewingLead.dataCriacao).toLocaleString('pt-BR')}</p>
+                  </div>
                 </div>
               </section>
 

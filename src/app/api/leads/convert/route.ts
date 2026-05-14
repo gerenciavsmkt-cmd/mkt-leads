@@ -82,6 +82,8 @@ export async function POST(request: Request) {
         origem: 'Conversão Direta (Site)',
         dataCriacao: agora,
         dataUltimaAtividade: agora,
+        dataUltimaConversao: agora,
+        totalConversoes: 1,
         consentimentoLGPD: true,
         observacoes: `[CONVERSÃO DIRETA] Cadastro automático via venda.${valor ? ` Valor: R$ ${valor}.` : ''}${pedidoId ? ` Pedido: ${pedidoId}.` : ''}`
       };
@@ -116,6 +118,8 @@ async function updateLead(leadId: string, nome?: string, celular?: string, valor
   const updateData: any = {
     status: 'convertido',
     dataUltimaAtividade: new Date().toISOString(),
+    dataUltimaConversao: new Date().toISOString(),
+    totalConversoes: (data?.totalConversoes || 1) + 1,
     tags: arrayUnion(...newTags),
     observacoes: (data?.observacoes || '') + novaObs
   };

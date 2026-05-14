@@ -97,24 +97,75 @@ export const api = {
   },
   
   saveLead: async (lead: Lead) => {
-    // Atualiza a data de última atividade sempre que o lead for salvo/alterado
-    lead.dataUltimaAtividade = new Date().toISOString();
-    
-    const sanitizedLead = JSON.parse(JSON.stringify(lead));
+    const agora = new Date().toISOString();
+    let targetId = lead.id;
+    let existingData: any = null;
+
+    // 1. Tentar encontrar lead por ID
     const leadRef = doc(db, COLLECTIONS.LEADS, lead.id);
     const snap = await getDoc(leadRef);
-    
+
     if (snap.exists()) {
-      await updateDoc(leadRef, sanitizedLead);
+      existingData = snap.data();
     } else {
-      await setDoc(leadRef, sanitizedLead);
+      // 2. Se não encontrar por ID, tentar por E-mail
+      if (lead.email) {
+        const q = query(collection(db, COLLECTIONS.LEADS), where('email', '==', lead.email));
+        const emailSnap = await getDocs(q);
+        if (!emailSnap.empty) {
+          targetId = emailSnap.docs[0].id;
+          existingData = emailSnap.docs[0].data();
+        }
+      }
+
+      // 3. Se ainda não encontrar, tentar por Celular
+      if (!existingData && lead.celular) {
+        const q = query(collection(db, COLLECTIONS.LEADS), where('celular', '==', lead.celular));
+        const phoneSnap = await getDocs(q);
+        if (!phoneSnap.empty) {
+          targetId = phoneSnap.docs[0].id;
+          existingData = phoneSnap.docs[0].data();
+        }
+      }
     }
-    
+
+    const sanitizedLead = JSON.parse(JSON.stringify(lead));
+    const finalRef = doc(db, COLLECTIONS.LEADS, targetId);
+
+    if (existingData) {
+      // Atualizar Lead Existente
+      const totalConversoes = (existingData.totalConversoes || 1) + (snap.exists() ? 0 : 1); // Só soma se for uma "nova" conversão (ID diferente)
+      
+      const updateData = {
+        ...sanitizedLead,
+        id: targetId,
+        totalConversoes,
+        dataUltimaConversao: snap.exists() ? (existingData.dataUltimaConversao || existingData.dataCriacao) : agora,
+        dataUltimaAtividade: agora,
+        // Manter dados que não queremos sobrescrever por completo se o novo lead for incompleto
+        nome: lead.nome && lead.nome !== 'Cliente' ? lead.nome : existingData.nome,
+        tags: Array.from(new Set([...(existingData.tags || []), ...(lead.tags || [])])),
+        observacoes: (existingData.observacoes || '') + (snap.exists() ? '' : `\n[RECONVERSÃO] Nova interação em ${new Date().toLocaleString('pt-BR')} via ${lead.origem}`)
+      };
+
+      await updateDoc(finalRef, updateData);
+      lead.id = targetId; // Atualiza o objeto local com o ID correto
+    } else {
+      // Criar Novo Lead
+      const newLead = {
+        ...sanitizedLead,
+        totalConversoes: 1,
+        dataUltimaConversao: agora,
+        dataUltimaAtividade: agora
+      };
+      await setDoc(finalRef, newLead);
+    }
+
     // Disparar evento para o sistema saber que há um novo lead (apenas localmente)
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('crm_new_lead', { detail: lead }));
     }
-    
+
     return lead;
   },
 

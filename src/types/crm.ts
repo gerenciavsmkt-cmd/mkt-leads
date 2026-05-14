@@ -21,6 +21,8 @@ export interface Lead {
   utm_campaign?: string;
   cidade?: string;
   estado?: string;
+  totalConversoes?: number;
+  dataUltimaConversao?: string;
 }
 
 export interface Campaign {
