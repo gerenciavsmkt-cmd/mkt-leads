@@ -17,7 +17,9 @@ import {
   MessageCircle,
   Trash2,
   Plus,
-  MessageSquare
+  MessageSquare,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function ConfigPage() {
@@ -61,6 +63,8 @@ export default function ConfigPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [showBrevoKey, setShowBrevoKey] = useState(false);
+  const [showEvolutionKey, setShowEvolutionKey] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -197,13 +201,20 @@ export default function ConfigPage() {
               <div style={{ position: 'relative' }}>
                 <Key size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
                 <input 
-                  type="password" 
+                  type={showBrevoKey ? "text" : "password"} 
                   className="btn-outline" 
-                  style={{ width: '100%', paddingLeft: '2.5rem', height: '42px' }} 
+                  style={{ width: '100%', paddingLeft: '2.5rem', paddingRight: '2.5rem', height: '42px' }} 
                   placeholder="xkeysib-..."
                   value={settings.brevoApiKey}
                   onChange={e => setSettings({...settings, brevoApiKey: e.target.value})}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowBrevoKey(!showBrevoKey)}
+                  style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}
+                >
+                  {showBrevoKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
               <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <button 
@@ -583,17 +594,26 @@ export default function ConfigPage() {
 
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Global API Key</label>
-              <input 
-                type="password" 
-                className="btn-outline" 
-                style={{ width: '100%', height: '42px', padding: '0 1rem', fontFamily: 'monospace' }} 
-                placeholder="Sua Global API Key da Evolution"
-                value={settings.omnichannel?.evolutionApiKey || ''}
-                onChange={e => setSettings({
-                  ...settings, 
-                  omnichannel: { ...settings.omnichannel, evolutionApiKey: e.target.value }
-                })}
-              />
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showEvolutionKey ? "text" : "password"} 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 2.5rem 0 1rem', fontFamily: 'monospace' }} 
+                  placeholder="Sua Global API Key da Evolution"
+                  value={settings.omnichannel?.evolutionApiKey || ''}
+                  onChange={e => setSettings({
+                    ...settings, 
+                    omnichannel: { ...settings.omnichannel, evolutionApiKey: e.target.value }
+                  })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEvolutionKey(!showEvolutionKey)}
+                  style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}
+                >
+                  {showEvolutionKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           </div>
         </section>

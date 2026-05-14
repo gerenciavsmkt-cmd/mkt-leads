@@ -2,6 +2,8 @@ services:
   evolution-api:
     image: atendai/evolution-api:v2.1.1
     restart: always
+    privileged: true
+    user: root
     environment:
       - SERVER_TYPE=http
       - SERVER_PORT=8080
@@ -28,6 +30,10 @@ services:
       - DATABASE_SAVE_DATA_MESSAGES=true
       - DATABASE_SAVE_MESSAGE_STATUS=true
       
+      # Otimização QR Code
+      - QRCODE_LIMIT=30
+      - QRCODE_BASE64=true
+      
     ports:
       - "8080:8080"
     volumes:
@@ -47,6 +53,10 @@ services:
       - "5432:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   redis:
     image: redis:alpine
@@ -55,3 +65,7 @@ services:
       - "6379:6379"
     volumes:
       - ./redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M

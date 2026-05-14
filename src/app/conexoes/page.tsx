@@ -45,20 +45,30 @@ export default function ConexoesPage() {
   const [showTestModal, setShowTestModal] = useState(false);
   const [testData, setTestData] = useState({ connectionId: '', phone: '', message: 'Olá! Este é um teste de conexão do Gerency Leads. 🚀', loading: false });
 
-  const fetchQrCode = async (connectionId: string) => {
+  const fetchQrCode = async (connectionId: string, instanceName?: string) => {
     setShowQrModal(true);
     setQrCodeData({ loading: true });
     try {
-      const res = await fetch(`/api/whatsapp/evolution/instance?connectionId=${connectionId}`);
+      const connection = connections.find(c => c.id === connectionId);
+      const res = await fetch(`/api/whatsapp/evolution/instance?connectionId=${connectionId}&instanceName=${connection?.name || ''}`);
       const data = await res.json();
+      
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar QR Code');
       
+      if (data.connected) {
+        setShowQrModal(false);
+        showToast('WhatsApp já está conectado!', 'success');
+        loadConnections();
+        return;
+      }
+
       setQrCodeData({ 
         base64: data.qrCodeBase64, 
+        pairingCode: data.pairingCode,
         loading: false,
         mock: data.mock
       });
-      loadConnections(); // Recarrega para atualizar o status do badge
+      loadConnections();
     } catch (err: any) {
       setQrCodeData({ loading: false, error: err.message });
     }
@@ -243,9 +253,13 @@ export default function ConexoesPage() {
                       <CheckCircle2 size={16} /> Conectado
                     </span>
                   ) : conn.status === 'pending' || conn.status === 'qr_code_ready' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#f59e0b', fontWeight: 600 }}>
-                      <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> Aguardando Leitura
-                    </span>
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => fetchQrCode(conn.id, conn.name)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      <MessageSquare size={16} /> Gerar QR Code
+                    </button>
                   ) : (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#ef4444', fontWeight: 600 }}>
                       <XCircle size={16} /> Desconectado
@@ -499,19 +513,26 @@ export default function ConexoesPage() {
                       Modo Simulação: A API oficial não foi configurada.
                     </div>
                   )}
-                  <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
-                    <img 
-                      src={qrCodeData.base64} 
-                      alt="QR Code do WhatsApp" 
-                      style={{ width: '250px', height: '250px', objectFit: 'contain' }} 
-                    />
-                  </div>
+                  {qrCodeData.base64 ? (
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
+                      <img 
+                        src={qrCodeData.base64} 
+                        alt="QR Code do WhatsApp" 
+                        style={{ width: '250px', height: '250px', objectFit: 'contain' }} 
+                      />
+                    </div>
+                  ) : qrCodeData.pairingCode ? (
+                    <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '1.5rem', border: '1px solid var(--border)', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.5rem' }}>Código de Emparelhamento:</p>
+                      <h2 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '4px', color: 'var(--primary)', margin: 0 }}>{qrCodeData.pairingCode}</h2>
+                    </div>
+                  ) : null}
                   <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Conecte seu WhatsApp</h3>
                   <p style={{ fontSize: '0.875rem', opacity: 0.7, lineHeight: 1.5 }}>
                     1. Abra o WhatsApp no seu celular<br/>
                     2. Toque em Mais opções <MoreVertical size={12} style={{display:'inline'}}/> ou Configurações<br/>
                     3. Toque em <strong>Aparelhos conectados</strong><br/>
-                    4. Aponte a câmera para esta tela
+                    4. {qrCodeData.pairingCode ? 'Toque em "Conectar com número de telefone" e digite o código acima' : 'Aponte a câmera para esta tela'}
                   </p>
                 </div>
               )}

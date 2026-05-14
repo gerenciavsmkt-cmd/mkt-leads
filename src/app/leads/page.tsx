@@ -15,8 +15,13 @@ import {
   Info,
   Download,
   Upload,
-  Check
+  Check,
+  FileSpreadsheet,
+  AlertCircle,
+  Loader2,
+  MessageCircle
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -38,6 +43,13 @@ export default function LeadsPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [viewingLead, setViewingLead] = useState<Lead | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
+  const [importAnalysis, setImportAnalysis] = useState<{
+    total: number;
+    toCreate: any[];
+    toUpdate: { lead: Lead; updates: any }[];
+    loading: boolean;
+  }>({ total: 0, toCreate: [], toUpdate: [], loading: false });
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,11 +61,13 @@ export default function LeadsPage() {
     title: string;
     message: string;
     onResolve: () => void;
+    loading?: boolean;
   }>({
     isOpen: false,
     title: '',
     message: '',
-    onResolve: () => {}
+    onResolve: () => {},
+    loading: false
   });
   
   // Form State
@@ -174,12 +188,16 @@ export default function LeadsPage() {
       title: 'Excluir em Massa',
       message: `Tem certeza que deseja excluir os ${selectedLeads.length} leads selecionados?`,
       onResolve: async () => {
-        for (const id of selectedLeads) {
-          await api.deleteLead(id);
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          for (const id of selectedLeads) {
+            await api.deleteLead(id);
+          }
+          setSelectedLeads([]);
+          await refreshLeads();
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
         }
-        setSelectedLeads([]);
-        await refreshLeads();
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -249,78 +267,124 @@ export default function LeadsPage() {
     document.body.removeChild(link);
   };
 
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImportStatus('Processando arquivo...');
+    setImportAnalysis(prev => ({ ...prev, loading: true }));
+    setIsImportPreviewOpen(true);
+
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split(/\r?\n/);
-      if (lines.length < 2) return;
+      const data = new Uint8Array(event.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      const headerLine = lines[0];
-      // Detectar o separador mais provável: Ponto-e-vírgula, Tabulação ou Vírgula
-      let separator = ',';
-      if (headerLine.includes(';')) separator = ';';
-      else if (headerLine.includes('\t')) separator = '\t';
-      
-      const headers = headerLine.split(separator).map(h => h.trim().toLowerCase());
-      
-      // Encontrar índices únicos para cada campo
-      const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
-      const idxNome = headers.findIndex(h => h.includes('nome') || h.includes('name'));
-      const idxTelefone = headers.findIndex(h => h.toLowerCase() === 'telefone');
-      const idxCelular = headers.findIndex(h => h.includes('celular') || h.includes('mobile'));
-      const idxEmpresa = headers.findIndex(h => h.includes('empresa') || h.includes('company') || h.includes('cargo'));
-      const idxCidade = headers.findIndex(h => h.includes('cidade') || h.includes('city'));
-      const idxEstado = headers.findIndex(h => h.includes('estado') || h.includes('state') || h.includes('uf'));
+      const toCreate: any[] = [];
+      const toUpdate: { lead: Lead; updates: any }[] = [];
 
-      let count = 0;
-      
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line.trim()) continue;
-        
-        const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
-        
-        const email = (idxEmail !== -1 && cols[idxEmail]) ? cols[idxEmail] : '';
-        const nome = (idxNome !== -1 && idxNome !== idxEmail && cols[idxNome]) ? cols[idxNome] : (email ? 'Sem Nome' : '');
-        const telefone = (idxTelefone !== -1 && idxTelefone !== idxEmail && cols[idxTelefone]) ? cols[idxTelefone] : '';
-        const celular = (idxCelular !== -1 && idxCelular !== idxEmail && cols[idxCelular]) ? cols[idxCelular] : '';
-        const empresa = (idxEmpresa !== -1 && idxEmpresa !== idxEmail && cols[idxEmpresa]) ? cols[idxEmpresa] : '';
-        const cidade = (idxCidade !== -1 && cols[idxCidade]) ? cols[idxCidade] : '';
-        const estado = (idxEstado !== -1 && cols[idxEstado]) ? cols[idxEstado] : '';
+      for (const row of jsonData) {
+        // Busca inteligente de colunas (case-insensitive e parcial)
+        const findValue = (keywords: string[]) => {
+          // Prioriza a ordem das keywords (ex: busca 'contato' em todas as colunas antes de buscar 'nome')
+          for (const kw of keywords) {
+            const key = Object.keys(row).find(k => k.toLowerCase().includes(kw.toLowerCase()));
+            if (key) return row[key]?.toString().trim();
+          }
+          return '';
+        };
 
-        if (email && email.includes('@') && email.length < 100) {
-          await api.saveLead({
-            id: Math.random().toString(36).substr(2, 9),
-            nome: nome || 'Sem Nome',
-            email: email,
-            telefone: telefone,
-            celular: celular,
-            empresa: empresa,
-            cidade: cidade,
-            estado: estado,
-            origem: 'Planilha RD/Massa',
-            dataCriacao: new Date().toISOString(),
-            status: 'novo',
-            tags: ['importado-planilha'],
-            consentimentoLGPD: true
-          });
-          count++;
+        const email = findValue(['email', 'e-mail', 'correio']);
+        const nome = findValue(['contato', 'contact', 'name', 'nome']); // Prioriza 'contato' sobre 'nome'
+        const rawTelefone = findValue(['celular', 'mobile', 'whatsapp', 'phone', 'telefone', 'fone']); // Remove 'contato' daqui
+        const telefone = rawTelefone.replace(/\D/g, ''); // Remove tudo o que não for número
+        const empresa = findValue(['empresa', 'company', 'companhia', 'organização', 'organization']);
+        const cidade = findValue(['cidade', 'city']);
+        const estado = findValue(['estado', 'state', 'uf']);
+        const observacoes = findValue(['obs', 'notas', 'notes', 'comentário']);
+
+        // Busca lead existente por qualquer um dos critérios
+        const existingLead = leads.find(l => 
+          (email && l.email?.toLowerCase() === email.toString().toLowerCase()) ||
+          (nome && l.nome?.toLowerCase() === nome.toString().toLowerCase()) ||
+          (telefone && (l.telefone === telefone.toString() || l.celular === telefone.toString())) ||
+          (empresa && l.empresa?.toLowerCase() === empresa.toString().toLowerCase())
+        );
+
+        const leadData = {
+          nome: nome || email.split('@')[0] || 'Lead Importado',
+          email: email,
+          telefone: telefone,
+          celular: telefone,
+          empresa: empresa,
+          cidade: cidade,
+          estado: estado,
+          origem: 'Importação Kommo',
+          tags: ['importado-kommo'],
+          observacoes: observacoes
+        };
+
+        if (existingLead) {
+          toUpdate.push({ lead: existingLead, updates: leadData });
+        } else {
+          toCreate.push(leadData);
         }
       }
-      
-      setImportStatus(`${count} leads importados com sucesso!`);
-      setTimeout(() => {
-        setIsImportModalOpen(false);
-        setImportStatus('');
-        refreshLeads();
-      }, 2000);
+
+      setImportAnalysis({
+        total: jsonData.length,
+        toCreate,
+        toUpdate,
+        loading: false
+      });
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
+  };
+
+  const confirmImport = async () => {
+    setImportAnalysis(prev => ({ ...prev, loading: true }));
+    
+    try {
+      // Processar Criações
+      for (const data of importAnalysis.toCreate) {
+        await api.saveLead({
+          ...data,
+          id: Math.random().toString(36).substr(2, 9),
+          dataCriacao: new Date().toISOString(),
+          status: 'novo',
+          consentimentoLGPD: true
+        });
+      }
+
+      // Processar Atualizações
+      for (const item of importAnalysis.toUpdate) {
+        await api.saveLead({
+          ...item.lead,
+          ...item.updates,
+          id: item.lead.id // Mantém o ID original
+        });
+      }
+
+      alert('Importação concluída com sucesso!');
+      setIsImportPreviewOpen(false);
+      refreshLeads();
+    } catch (error) {
+      console.error(error);
+      alert('Erro durante a importação.');
+    } finally {
+      setImportAnalysis(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleWhatsAppClick = (telefone: string) => {
+    if (!telefone) return;
+    const cleanNumber = telefone.replace(/\D/g, '');
+    const lead = leads.find(l => (l.celular || l.telefone)?.replace(/\D/g, '') === cleanNumber);
+    const nameParam = lead ? `&name=${encodeURIComponent(lead.nome)}` : '';
+    // Redireciona para a central de atendimento com o filtro do número e o nome
+    window.location.href = `/atendimento?search=${cleanNumber}${nameParam}`;
   };
 
   const filteredLeads = leads.filter(lead => {
@@ -390,8 +454,8 @@ export default function LeadsPage() {
             <button className="btn btn-outline" onClick={handleExportLeads}>
               <Download size={18} /> Exportar Backup
             </button>
-            <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
-              <Upload size={18} /> Importar Planilha
+            <button className="btn btn-outline" onClick={() => setIsImportPreviewOpen(true)}>
+              <Upload size={18} /> Importar Excel
             </button>
             <button className="btn btn-primary" onClick={() => openModal()}>
               <UserPlus size={18} /> Novo Lead
@@ -523,6 +587,18 @@ export default function LeadsPage() {
         <div className="card" style={{ marginBottom: '1.5rem', padding: '0.75rem 1.5rem', background: 'var(--primary)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{selectedLeads.length} leads selecionados</span>
           <div style={{ display: 'flex', gap: '1rem' }}>
+            {selectedLeads.length === 1 && (
+              <button 
+                className="btn" 
+                style={{ background: '#25D366', color: 'white' }} 
+                onClick={() => {
+                  const lead = leads.find(l => l.id === selectedLeads[0]);
+                  if (lead) handleWhatsAppClick(lead.celular || lead.telefone || '');
+                }}
+              >
+                <MessageCircle size={18} /> Falar no WhatsApp
+              </button>
+            )}
             <button className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }} onClick={() => setIsSegmentModalOpen(true)}>
                Criar Segmento
             </button>
@@ -580,6 +656,9 @@ export default function LeadsPage() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {(lead.celular || lead.telefone) && (
+                      <button style={{ color: '#25D366' }} onClick={() => handleWhatsAppClick(lead.celular || lead.telefone || '')} title="WhatsApp"><MessageCircle size={18} /></button>
+                    )}
                     <button style={{ opacity: 0.6, color: 'var(--primary)' }} onClick={() => { setViewingLead(lead); setIsDetailsOpen(true); }} title="Ver Detalhes"><Eye size={18} /></button>
                     <button style={{ opacity: 0.4 }} onClick={() => openModal(lead)} title="Editar"><TagIcon size={18} /></button>
                     <button style={{ opacity: 0.4, color: 'var(--danger)' }} onClick={() => handleDelete(lead.id)} title="Excluir"><Trash2 size={18} /></button>
@@ -878,10 +957,17 @@ export default function LeadsPage() {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button 
                 className="btn" 
-                style={{ flex: 1, background: 'var(--danger)', color: 'white' }} 
+                style={{ flex: 1, background: 'var(--danger)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} 
                 onClick={confirmModal.onResolve}
+                disabled={confirmModal.loading}
               >
-                Confirmar
+                {confirmModal.loading ? (
+                  <>
+                    <Loader2 size={18} className="spin" /> Excluindo...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
               </button>
               <button 
                 className="btn btn-outline" 
@@ -894,27 +980,82 @@ export default function LeadsPage() {
           </div>
         </div>
       )}
-      {isImportModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div className="card" style={{ width: '400px', position: 'relative' }}>
-            <button style={{ position: 'absolute', right: '1rem', top: '1rem', opacity: 0.5 }} onClick={() => setIsImportModalOpen(false)}>
-              <X size={20} />
-            </button>
-            <h3 style={{ marginBottom: '1.5rem' }}>Importar Leads em Massa</h3>
-            <p style={{ fontSize: '0.875rem', opacity: 0.6, marginBottom: '1.5rem' }}>
-              O arquivo deve ser um <strong>.CSV</strong> contendo as colunas: <strong>nome, email, telefone</strong> na primeira linha.
-            </p>
-            
-            <div style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius)', padding: '2rem', textAlign: 'center', cursor: 'pointer' }} onClick={() => document.getElementById('bulk-csv-file')?.click()}>
-              <Upload size={32} style={{ color: 'var(--primary)', marginBottom: '1rem' }} />
-              <p>{importStatus || 'Clique para selecionar arquivo .csv'}</p>
-              <input 
-                id="bulk-csv-file" 
-                type="file" 
-                accept=".csv" 
-                hidden 
-                onChange={handleImportCSV}
-              />
+      {isImportPreviewOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
+          <div className="card" style={{ width: '500px', position: 'relative', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <FileSpreadsheet size={24} style={{ color: 'var(--primary)' }} />
+                <h3 style={{ margin: 0 }}>Importação Inteligente</h3>
+              </div>
+              <button style={{ opacity: 0.5 }} onClick={() => setIsImportPreviewOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '2rem' }}>
+              {!importAnalysis.total && !importAnalysis.loading ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div 
+                    style={{ border: '2px dashed var(--border)', borderRadius: 'var(--radius)', padding: '3rem 2rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                    onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                    onClick={() => document.getElementById('import-excel-file')?.click()}
+                  >
+                    <Upload size={48} style={{ color: 'var(--primary)', marginBottom: '1rem', margin: '0 auto' }} />
+                    <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Clique para selecionar a planilha do Kommo</p>
+                    <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>Formatos suportados: .xlsx, .xls</p>
+                    <input 
+                      id="import-excel-file" 
+                      type="file" 
+                      accept=".xlsx, .xls" 
+                      hidden 
+                      onChange={handleImportExcel}
+                    />
+                  </div>
+                </div>
+              ) : importAnalysis.loading ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Loader2 size={48} className="spin" style={{ color: 'var(--primary)', margin: '0 auto 1rem' }} />
+                  <p style={{ fontWeight: 600 }}>Processando dados...</p>
+                  <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>Isso pode levar alguns segundos dependendo do tamanho da planilha.</p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
+                    <h4 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Resumo da Importação</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <p style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.25rem' }}>Novos Leads</p>
+                        <p style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>+ {importAnalysis.toCreate.length}</p>
+                      </div>
+                      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <p style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.25rem' }}>Existentes (Atualizar)</p>
+                        <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>{importAnalysis.toUpdate.length}</p>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertCircle size={16} />
+                      Total de <strong>{importAnalysis.total}</strong> leads analisados na planilha.
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#fffbeb', border: '1px solid #fef3c7', padding: '1rem', borderRadius: 'var(--radius)', fontSize: '0.875rem', color: '#92400e', marginBottom: '1.5rem' }}>
+                    <strong>Aviso de Inteligência:</strong> O sistema identificou duplicatas comparando Nome, E-mail, Telefone e Empresa. Os dados existentes serão mantidos e novos campos serão preenchidos.
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button className="btn btn-primary" style={{ flex: 2, height: '48px' }} onClick={confirmImport}>
+                      Confirmar e Processar Agora
+                    </button>
+                    <button className="btn btn-outline" style={{ flex: 1, height: '48px' }} onClick={() => {
+                      setImportAnalysis({ total: 0, toCreate: [], toUpdate: [], loading: false });
+                    }}>
+                      Trocar Arquivo
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

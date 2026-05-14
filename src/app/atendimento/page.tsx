@@ -1,7 +1,8 @@
 'use client';
 // Updated: 2026-05-07 10:40
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Search, 
   Filter, 
@@ -48,7 +49,8 @@ const META_TEMPLATES = [
   "Lembrete: Sua oferta especial expira em breve! Gostaria de aproveitar?"
 ];
 
-export default function AtendimentoPage() {
+function AtendimentoContent() {
+  const searchParams = useSearchParams();
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -65,6 +67,14 @@ export default function AtendimentoPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
+
+  // Efeito para capturar busca vinda de outras páginas (como Leads)
+  useEffect(() => {
+    const search = searchParams.get('search');
+    if (search) {
+      setSearchQuery(search);
+    }
+  }, [searchParams]);
 
   const EMOJIS = ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😻', '😼', '😽', '🙀', '😿', '😾'];
 
@@ -286,9 +296,48 @@ export default function AtendimentoPage() {
     return <Hash size={size} />;
   };
 
+  const handleStartNewChat = async () => {
+    if (!searchQuery) return;
+    
+    setLoading(true);
+    try {
+      const cleanNumber = searchQuery.replace(/\D/g, '');
+      const chatId = `${cleanNumber}@s.whatsapp.net`;
+      const leadNameFromUrl = searchParams.get('name');
+      
+      // Verifica se já existe (prevenção)
+      const existing = chats.find(c => c.id === chatId || c.leadId.includes(cleanNumber));
+      if (existing) {
+        setSelectedChatId(existing.id);
+        return;
+      }
+
+      // Cria sessão temporária/nova no Firestore
+      const newChat: ChatSession = {
+        id: chatId,
+        leadId: chatId,
+        leadName: leadNameFromUrl || `Lead ${cleanNumber}`,
+        channel: 'whatsapp',
+        lastMessage: 'Iniciando conversa...',
+        lastTimestamp: new Date().toISOString(),
+        unreadCount: 0,
+        status: 'active',
+        connectionId: connections[0]?.id || '' // Usa a primeira conexão disponível
+      };
+
+      await api.saveChatSession(newChat);
+      setSelectedChatId(chatId);
+    } catch (error) {
+      console.error('Erro ao iniciar chat:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredChats = chats.filter(chat => 
     chat.leadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase())
+    chat.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chat.leadId.includes(searchQuery)
   );
 
   const activeChat = chats.find(c => c.id === selectedChatId);
@@ -368,7 +417,16 @@ export default function AtendimentoPage() {
           ) : (
             <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#94a3b8' }}>
                <MessageSquare size={32} style={{ margin: '0 auto 1rem', opacity: 0.2 }} />
-               <p style={{ fontSize: '0.875rem' }}>Nenhuma conversa encontrada.</p>
+               <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>Nenhuma conversa encontrada.</p>
+               {searchQuery && (
+                 <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', fontSize: '0.8rem' }}
+                  onClick={handleStartNewChat}
+                 >
+                   <Send size={14} /> Iniciar chat com {searchQuery}
+                 </button>
+               )}
             </div>
           )}
         </div>
@@ -787,5 +845,12 @@ export default function AtendimentoPage() {
         }
       `}</style>
     </div>
+  );
+}
+export default function AtendimentoPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <AtendimentoContent />
+    </Suspense>
   );
 }

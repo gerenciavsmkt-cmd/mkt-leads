@@ -619,6 +619,12 @@ export const api = {
     await updateDoc(chatRef, { unreadCount: 0 });
   },
 
+  saveChatSession: async (session: any) => {
+    const chatRef = doc(db, COLLECTIONS.CHATS, session.id);
+    await setDoc(chatRef, session);
+    return session;
+  },
+
   // --- WHATSAPP CONNECTIONS ---
   getWhatsappConnections: async (): Promise<WhatsappConnection[]> => {
     const querySnapshot = await getDocs(collection(db, COLLECTIONS.WHATSAPP_CONNECTIONS));
