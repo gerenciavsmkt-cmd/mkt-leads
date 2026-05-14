@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data
+/postgres_data
+/evolution_data
+/redis_data
+/scratch
+/.gemini
