@@ -66,7 +66,9 @@ export default function WhatsappWidgetStandalone() {
         page_source: 'external_widget',
         lead_name: formData.nome,
         lead_email: formData.email,
-        lead_phone: formData.telefone
+        lead_phone: formData.telefone,
+        email: formData.email,
+        phone: formData.telefone
       });
     }
 

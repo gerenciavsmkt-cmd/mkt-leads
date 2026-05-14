@@ -402,7 +402,9 @@ function WhatsappWidget({ config, pageSlug }: { config: any, pageSlug: string })
         page_source: pageSlug,
         lead_name: formData.nome,
         lead_email: formData.email,
-        lead_phone: formData.telefone
+        lead_phone: formData.telefone,
+        email: formData.email,
+        phone: formData.telefone
       });
     }
 
@@ -545,7 +547,11 @@ function RenderLandingPage({ page }: { page: LandingPageInstance }) {
         event: 'generate_lead',
         lead_source: page.slug,
         lead_type: page.templateId,
-        email: formData.email // Útil para Enhanced Conversions se o GTM estiver configurado para capturar
+        lead_name: formData.nome,
+        lead_email: formData.email,
+        lead_phone: formData.telefone,
+        email: formData.email,
+        phone: formData.telefone
       });
     }
 
