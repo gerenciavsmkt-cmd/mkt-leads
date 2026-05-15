@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
     
     const clientId = settings.omnichannel?.youtubeClientId;
     const clientSecret = settings.omnichannel?.youtubeClientSecret;
-    const origin = new URL(req.url).origin;
+    let origin = new URL(req.url).origin;
+    if (origin.includes('0.0.0.0')) origin = origin.replace('0.0.0.0', 'localhost');
+    if (origin.includes('localhost') && origin.startsWith('https')) origin = origin.replace('https', 'http');
+
     const redirectUri = `${origin}/api/auth/callback/youtube`;
 
     // Exchange code for tokens

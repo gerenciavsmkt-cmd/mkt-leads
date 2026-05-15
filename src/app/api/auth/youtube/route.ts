@@ -12,7 +12,18 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Client ID not configured', { status: 400 });
     }
 
-    const redirectUri = `${new URL(req.url).origin}/api/auth/callback/youtube`;
+    let origin = new URL(req.url).origin;
+    
+    // Correção para 0.0.0.0 ou protocolos incorretos em ambiente de dev
+    if (origin.includes('0.0.0.0')) {
+      origin = origin.replace('0.0.0.0', 'localhost');
+    }
+    // Google não aceita HTTPS em localhost exceto com certificado real
+    if (origin.includes('localhost') && origin.startsWith('https')) {
+      origin = origin.replace('https', 'http');
+    }
+
+    const redirectUri = `${origin}/api/auth/callback/youtube`;
     const scope = 'https://www.googleapis.com/auth/youtube.force-ssl';
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
