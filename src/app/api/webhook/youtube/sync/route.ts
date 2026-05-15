@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       const text = snippet.textDisplay;
       const timestamp = snippet.publishedAt;
 
-      const chatId = `youtube_${authorId}`;
+      const chatId = `youtube_${commentId}`;
       const chatRef = doc(db, 'atendimentos_v3', chatId);
       
       // Verificar se essa mensagem já foi salva (para evitar duplicidade no poll)
