@@ -7,7 +7,8 @@ export async function sendOmnichannelMessageAction(
   recipientIdOrPhone: string, 
   channel: string, 
   text: string, 
-  connectionId?: string
+  connectionId?: string,
+  templateData?: { name: string, language: string, components?: any[] }
 ) {
   try {
     // 1. Lógica para INSTAGRAM e FACEBOOK
@@ -78,18 +79,30 @@ export async function sendOmnichannelMessageAction(
           return { success: false, error: 'Credenciais da API Oficial ausentes nesta conexão.' };
         }
 
+        let body: any = {
+          messaging_product: "whatsapp",
+          to: recipientIdOrPhone
+        };
+
+        if (templateData) {
+          body.type = "template";
+          body.template = {
+            name: templateData.name,
+            language: { code: templateData.language || 'pt_BR' },
+            components: templateData.components || []
+          };
+        } else {
+          body.type = "text";
+          body.text = { body: text };
+        }
+
         const response = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: recipientIdOrPhone,
-            type: "text",
-            text: { body: text }
-          })
+          body: JSON.stringify(body)
         });
 
         const data = await response.json();
@@ -142,6 +155,93 @@ export async function sendOmnichannelMessageAction(
         return response.ok ? { success: true, data } : { success: false, error: data.error || 'Erro no Docker' };
 
       }
+    }
+
+    // 3. Lógica para TIKTOK
+    if (channel === 'tiktok') {
+      const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+      const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+      const token = settings.omnichannel?.tiktokAccessToken;
+
+      if (!token) {
+        return { success: false, error: 'Token do TikTok não configurado.' };
+      }
+
+      const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/message/send/`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Token': token
+        },
+        body: JSON.stringify({
+          recipient_id: recipientIdOrPhone,
+          message_type: "TEXT",
+          text: text
+        })
+      });
+
+      const data = await response.json();
+      return response.ok ? { success: true, data } : { success: false, error: data.message || 'Erro na API do TikTok' };
+    }
+
+    // 4. Lógica para YOUTUBE (Comments)
+    if (channel === 'youtube') {
+      const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+      const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+      
+      let accessToken = settings.omnichannel?.youtubeAccessToken;
+      const refreshToken = settings.omnichannel?.youtubeRefreshToken;
+      const expiry = settings.omnichannel?.youtubeTokenExpiry;
+      const clientId = settings.omnichannel?.youtubeClientId;
+      const clientSecret = settings.omnichannel?.youtubeClientSecret;
+
+      if (!refreshToken || !clientId || !clientSecret) {
+        return { success: false, error: 'YouTube OAuth2 não configurado (Falta conectar o canal).' };
+      }
+
+      // Refresh Token se expirado (ou perto de expirar)
+      const isExpired = !expiry || new Date(expiry).getTime() < Date.now() + 60000;
+      if (isExpired) {
+        console.log('>>> Refreshing YouTube Token...');
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: 'refresh_token',
+          }),
+        });
+        const refreshData = await refreshResponse.json();
+        if (refreshResponse.ok) {
+          accessToken = refreshData.access_token;
+          await updateDoc(doc(db, 'settings', 'global'), {
+            'omnichannel.youtubeAccessToken': accessToken,
+            'omnichannel.youtubeTokenExpiry': new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+          });
+        } else {
+          return { success: false, error: 'Falha ao renovar token do YouTube. Tente reconectar o canal.' };
+        }
+      }
+
+      // Enviar Resposta
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/comments?part=snippet`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          snippet: {
+            parentId: recipientIdOrPhone, // O ID do comentário original
+            textOriginal: text
+          }
+        })
+      });
+
+      const data = await response.json();
+      return response.ok ? { success: true, data } : { success: false, error: data.error?.message || 'Erro ao postar comentário' };
     }
 
     return { success: false, error: 'Canal desconhecido.' };

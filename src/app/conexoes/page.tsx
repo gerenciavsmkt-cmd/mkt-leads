@@ -31,6 +31,18 @@ export default function ConexoesPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
+  const [activeTab, setActiveTab] = useState<'connections' | 'templates'>('connections');
+  
+  // Templates States
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateFormData, setTemplateFormData] = useState<any>({
+    name: '',
+    connectionId: '',
+    category: 'MARKETING',
+    language: 'pt_BR',
+    content: ''
+  });
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -110,7 +122,17 @@ export default function ConexoesPage() {
 
   useEffect(() => {
     loadConnections();
+    loadTemplates();
   }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const data = await api.getWhatsappTemplates();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+    }
+  };
 
   const handleEdit = (conn: WhatsappConnection) => {
     setEditingId(conn.id);
@@ -164,6 +186,35 @@ export default function ConexoesPage() {
     setSaving(false);
   };
 
+  const handleSaveTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const id = editingId || Math.random().toString(36).substr(2, 9);
+      const payload = {
+        ...templateFormData,
+        id,
+        dataCriacao: new Date().toISOString()
+      };
+      await api.saveWhatsappTemplate(payload);
+      showToast('Modelo salvo com sucesso!', 'success');
+      setShowTemplateModal(false);
+      setEditingId(null);
+      loadTemplates();
+    } catch (error) {
+      showToast('Erro ao salvar modelo.', 'error');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (confirm('Deseja excluir este modelo?')) {
+      await api.deleteWhatsappTemplate(id);
+      loadTemplates();
+      showToast('Modelo excluído.', 'success');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta conexão? As mensagens antigas continuarão salvas, mas novas não chegarão por aqui.')) {
       await api.deleteWhatsappConnection(id);
@@ -185,144 +236,240 @@ export default function ConexoesPage() {
         </div>
         <button 
           onClick={() => {
-            setEditingId(null);
-            setFormData({ name: '', type: 'evolution_api', isDefault: false });
-            setShowModal(true);
+            if (activeTab === 'connections') {
+              setEditingId(null);
+              setFormData({ name: '', type: 'evolution_api', isDefault: false });
+              setShowModal(true);
+            } else {
+              setEditingId(null);
+              setTemplateFormData({ name: '', connectionId: '', category: 'MARKETING', language: 'pt_BR', content: '' });
+              setShowTemplateModal(true);
+            }
           }}
           className="btn btn-primary"
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: '44px', padding: '0 1.5rem' }}
         >
           <Plus size={18} />
-          Nova Conexão
+          {activeTab === 'connections' ? 'Nova Conexão' : 'Cadastrar Modelo'}
         </button>
       </header>
 
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-          <RefreshCw style={{ animation: 'spin 1s linear infinite', opacity: 0.4 }} size={32} />
-        </div>
-      ) : connections.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: '64px', height: '64px', backgroundColor: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-            <Smartphone style={{ opacity: 0.4 }} size={32} />
-          </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Nenhuma conexão encontrada</h3>
-          <p style={{ opacity: 0.6, marginBottom: '2rem', maxWidth: '400px' }}>
-            Adicione uma conexão da API Oficial da Meta ou da Evolution API para começar a receber mensagens.
-          </p>
-          <button 
-            onClick={() => setShowModal(true)}
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: '44px' }}
-          >
-            <Plus size={18} />
-            Adicionar Primeiro WhatsApp
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          {connections.map((conn) => (
-            <div key={conn.id} className="card" style={{ position: 'relative', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-              {conn.isDefault && (
-                <div style={{ position: 'absolute', top: 0, right: 0, background: 'var(--primary)', color: 'white', fontSize: '0.7rem', padding: '0.25rem 0.75rem', borderBottomLeftRadius: '8px', fontWeight: 600 }}>
-                  Principal
-                </div>
-              )}
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ 
-                  width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: conn.type === 'meta_official' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                  color: conn.type === 'meta_official' ? '#3b82f6' : '#10b981'
-                }}>
-                  {conn.type === 'meta_official' ? <ShieldCheck size={24} /> : <Zap size={24} />}
-                </div>
-                <div>
-                  <h3 style={{ fontWeight: 600, fontSize: '1.1rem', margin: 0 }}>{conn.name}</h3>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {conn.type === 'meta_official' ? 'API Oficial Meta' : 'Evolution API'}
-                  </span>
-                </div>
-              </div>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid var(--border)' }}>
+        <button 
+          onClick={() => setActiveTab('connections')}
+          style={{ 
+            padding: '1rem 0.5rem', 
+            background: 'none', 
+            border: 'none', 
+            borderBottom: activeTab === 'connections' ? '3px solid var(--primary)' : '3px solid transparent',
+            color: activeTab === 'connections' ? 'var(--primary)' : 'inherit',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          Conexões WhatsApp
+        </button>
+        <button 
+          onClick={() => setActiveTab('templates')}
+          style={{ 
+            padding: '1rem 0.5rem', 
+            background: 'none', 
+            border: 'none', 
+            borderBottom: activeTab === 'templates' ? '3px solid var(--primary)' : '3px solid transparent',
+            color: activeTab === 'templates' ? 'var(--primary)' : 'inherit',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          Modelos de Mensagem (Templates)
+        </button>
+      </div>
 
-              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem', flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
-                  <span style={{ opacity: 0.6 }}>Status</span>
-                  {conn.status === 'connected' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 600 }}>
-                      <CheckCircle2 size={16} /> Conectado
-                    </span>
-                  ) : conn.status === 'pending' || conn.status === 'qr_code_ready' ? (
-                    <button 
-                      className="btn btn-primary btn-sm"
-                      onClick={() => fetchQrCode(conn.id, conn.name)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      <MessageSquare size={16} /> Gerar QR Code
-                    </button>
-                  ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#ef4444', fontWeight: 600 }}>
-                      <XCircle size={16} /> Desconectado
-                    </span>
-                  )}
-                </div>
-                
-                {conn.type === 'evolution_api' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
-                    <span style={{ opacity: 0.6 }}>Instância</span>
-                    <span style={{ fontFamily: 'monospace', background: 'var(--background)', padding: '2px 6px', borderRadius: '4px' }}>
-                      {conn.evolutionInstanceName || 'N/A'}
-                    </span>
-                  </div>
-                )}
-                
-                {conn.type === 'meta_official' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
-                    <span style={{ opacity: 0.6 }}>ID do Telefone</span>
-                    <span style={{ fontFamily: 'monospace', background: 'var(--background)', padding: '2px 6px', borderRadius: '4px' }}>
-                      {conn.metaPhoneNumberId || 'N/A'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                {conn.type === 'evolution_api' && conn.status !== 'connected' && (
-                  <button onClick={() => fetchQrCode(conn.id)} className="btn btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', height: '36px', fontSize: '0.875rem' }}>
-                    <QrCode size={16} /> Ver QR Code
-                  </button>
-                )}
-                {conn.status === 'connected' && (
-                  <button 
-                    onClick={() => {
-                      setTestData({ ...testData, connectionId: conn.id, phone: '' });
-                      setShowTestModal(true);
-                    }} 
-                    className="btn btn-outline" 
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', height: '36px', fontSize: '0.875rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-                  >
-                    <Zap size={16} /> Testar Envio
-                  </button>
-                )}
-                <button 
-                  onClick={() => handleEdit(conn)}
-                  className="btn-outline"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', padding: 0 }}
-                  title="Editar conexão"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button 
-                  onClick={() => handleDelete(conn.id)}
-                  className="btn-outline"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', padding: 0, color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                  title="Excluir conexão"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+      {activeTab === 'connections' ? (
+        <>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+              <RefreshCw style={{ animation: 'spin 1s linear infinite', opacity: 0.4 }} size={32} />
             </div>
-          ))}
+          ) : connections.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ width: '64px', height: '64px', backgroundColor: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <Smartphone style={{ opacity: 0.4 }} size={32} />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>Nenhuma conexão encontrada</h3>
+              <p style={{ opacity: 0.6, marginBottom: '2rem', maxWidth: '400px' }}>
+                Adicione uma conexão da API Oficial da Meta ou da Evolution API para começar a receber mensagens.
+              </p>
+              <button 
+                onClick={() => setShowModal(true)}
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', height: '44px' }}
+              >
+                <Plus size={18} />
+                Adicionar Primeiro WhatsApp
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+              {connections.map((conn) => (
+                <div key={conn.id} className="card" style={{ position: 'relative', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                  {conn.isDefault && (
+                    <div style={{ position: 'absolute', top: 0, right: 0, background: 'var(--primary)', color: 'white', fontSize: '0.7rem', padding: '0.25rem 0.75rem', borderBottomLeftRadius: '8px', fontWeight: 600 }}>
+                      Principal
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ 
+                      width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: conn.type === 'meta_official' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      color: conn.type === 'meta_official' ? '#3b82f6' : '#10b981'
+                    }}>
+                      {conn.type === 'meta_official' ? <ShieldCheck size={24} /> : <Zap size={24} />}
+                    </div>
+                    <div>
+                      <h3 style={{ fontWeight: 600, fontSize: '1.1rem', margin: 0 }}>{conn.name}</h3>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {conn.type === 'meta_official' ? 'API Oficial Meta' : 'Evolution API'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem', flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                      <span style={{ opacity: 0.6 }}>Status</span>
+                      {conn.status === 'connected' ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 600 }}>
+                          <CheckCircle2 size={16} /> Conectado
+                        </span>
+                      ) : conn.status === 'pending' || conn.status === 'qr_code_ready' ? (
+                        <button 
+                          className="btn btn-primary btn-sm"
+                          onClick={() => fetchQrCode(conn.id, conn.name)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                          <MessageSquare size={16} /> Gerar QR Code
+                        </button>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#ef4444', fontWeight: 600 }}>
+                          <XCircle size={16} /> Desconectado
+                        </span>
+                      )}
+                    </div>
+                    
+                    {conn.type === 'evolution_api' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                        <span style={{ opacity: 0.6 }}>Instância</span>
+                        <span style={{ fontFamily: 'monospace', background: 'var(--background)', padding: '2px 6px', borderRadius: '4px' }}>
+                          {conn.evolutionInstanceName || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {conn.type === 'meta_official' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
+                        <span style={{ opacity: 0.6 }}>ID do Telefone</span>
+                        <span style={{ fontFamily: 'monospace', background: 'var(--background)', padding: '2px 6px', borderRadius: '4px' }}>
+                          {conn.metaPhoneNumberId || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                    {conn.type === 'evolution_api' && conn.status !== 'connected' && (
+                      <button onClick={() => fetchQrCode(conn.id)} className="btn btn-outline" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', height: '36px', fontSize: '0.875rem' }}>
+                        <QrCode size={16} /> Ver QR Code
+                      </button>
+                    )}
+                    {conn.status === 'connected' && (
+                      <button 
+                        onClick={() => {
+                          setTestData({ ...testData, connectionId: conn.id, phone: '' });
+                          setShowTestModal(true);
+                        }} 
+                        className="btn btn-outline" 
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', height: '36px', fontSize: '0.875rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                      >
+                        <Zap size={16} /> Testar Envio
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleEdit(conn)}
+                      className="btn-outline"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', padding: 0 }}
+                      title="Editar conexão"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(conn.id)}
+                      className="btn-outline"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', padding: 0, color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                      title="Excluir conexão"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ display: 'grid', gap: '2rem' }}>
+          {/* Guia para o Usuário */}
+          <div className="card" style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldCheck size={20} /> Como configurar seus modelos na Meta?
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+               <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
+                 <p style={{ fontWeight: 700, marginBottom: '0.5rem' }}>1. Acesse o Business Suite</p>
+                 <p>Vá em <a href="https://business.facebook.com/" target="_blank" style={{ color: 'var(--primary)', fontWeight: 600 }}>Gerenciador de Negócios</a> &gt; Configurações &gt; WhatsApp Manager.</p>
+               </div>
+               <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
+                 <p style={{ fontWeight: 700, marginBottom: '0.5rem' }}>2. Crie seu Template</p>
+                 <p>Clique em "Modelos de Mensagem" e crie seu modelo. Use variáveis como <strong>{"{{1}}"}</strong> para o nome do cliente.</p>
+               </div>
+               <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
+                 <p style={{ fontWeight: 700, marginBottom: '0.5rem' }}>3. Cadastre aqui no CRM</p>
+                 <p>Assim que a Meta aprovar, copie o <strong>Nome de Referência</strong> e cole no formulário abaixo.</p>
+               </div>
+            </div>
+          </div>
+
+          {/* Lista de Templates */}
+          {templates.length === 0 ? (
+             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+               <p style={{ opacity: 0.5 }}>Nenhum modelo cadastrado. Use o botão acima para adicionar.</p>
+             </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+              {templates.map(tpl => (
+                <div key={tpl.id} className="card" style={{ padding: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <div>
+                      <h4 style={{ fontWeight: 700, fontSize: '1.1rem' }}>{tpl.name}</h4>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                        {tpl.category} • {tpl.language}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button onClick={() => { setEditingId(tpl.id); setTemplateFormData(tpl); setShowTemplateModal(true); }} className="btn-outline" style={{ width: '32px', height: '32px', padding: 0 }}><Pencil size={14}/></button>
+                      <button onClick={() => handleDeleteTemplate(tpl.id)} className="btn-outline" style={{ width: '32px', height: '32px', padding: 0, color: 'var(--danger)' }}><Trash2 size={14}/></button>
+                    </div>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', fontSize: '0.85rem', whiteSpace: 'pre-wrap', border: '1px solid #e2e8f0' }}>
+                    {tpl.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -620,6 +767,78 @@ export default function ConexoesPage() {
                     </>
                   )}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TEMPLATE */}
+      {showTemplateModal && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' 
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '550px', padding: 0 }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Cadastrar Modelo da Meta</h2>
+              <button onClick={() => setShowTemplateModal(false)}><XCircle size={24} /></button>
+            </div>
+            <form onSubmit={handleSaveTemplate} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>Conexão Meta Relacionada</label>
+                <select 
+                  required
+                  className="btn-outline"
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }}
+                  value={templateFormData.connectionId}
+                  onChange={e => setTemplateFormData({...templateFormData, connectionId: e.target.value})}
+                >
+                  <option value="">Selecione uma conexão...</option>
+                  {connections.filter(c => c.type === 'meta_official').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>Nome (Identificador)</label>
+                  <input 
+                    type="text" required
+                    className="btn-outline" style={{ width: '100%', height: '42px', padding: '0 1rem' }}
+                    placeholder="ex: boas_vindas_v01"
+                    value={templateFormData.name}
+                    onChange={e => setTemplateFormData({...templateFormData, name: e.target.value.toLowerCase().replace(/ /g, '_')})}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>Categoria</label>
+                  <select 
+                    className="btn-outline" style={{ width: '100%', height: '42px', padding: '0 1rem' }}
+                    value={templateFormData.category}
+                    onChange={e => setTemplateFormData({...templateFormData, category: e.target.value})}
+                  >
+                    <option value="MARKETING">Marketing</option>
+                    <option value="UTILITY">Utilidade</option>
+                    <option value="AUTHENTICATION">Autenticação</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>Texto do Modelo</label>
+                <textarea 
+                  required
+                  className="btn-outline" style={{ width: '100%', height: '120px', padding: '1rem', resize: 'none' }}
+                  placeholder={"Olá {{1}}, vimos seu interesse em {{2}}..."}
+                  value={templateFormData.content}
+                  onChange={e => setTemplateFormData({...templateFormData, content: e.target.value})}
+                />
+                <p style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '0.5rem' }}>Importante: O texto deve ser idêntico ao que foi aprovado na Meta.</p>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowTemplateModal(false)} className="btn btn-outline">Cancelar</button>
+                <button type="submit" className="btn btn-primary">{saving ? 'Salvando...' : 'Salvar Modelo'}</button>
               </div>
             </form>
           </div>

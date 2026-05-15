@@ -1,4 +1,4 @@
-import { Lead, Campaign, FilaEnvio, Settings, LandingPageInstance, LandingPageSettings, BioLink, UserProfile, Segmentation, PopupConfig, ChatSession, ChatMessage, WhatsappConnection } from '@/types/crm';
+import { Lead, Campaign, FilaEnvio, Settings, LandingPageInstance, LandingPageSettings, BioLink, UserProfile, Segmentation, PopupConfig, ChatSession, ChatMessage, WhatsappConnection, WhatsappTemplate } from '@/types/crm';
 import { db } from '@/lib/firebase';
 import { sendEmailBrevoAction } from '@/app/actions/brevo';
 import { processQueueServerAction } from '@/app/actions/queue';
@@ -169,6 +169,23 @@ export const api = {
     return lead;
   },
 
+  async getWhatsappTemplates(connectionId?: string): Promise<WhatsappTemplate[]> {
+    const q = connectionId 
+      ? query(collection(db, 'whatsapp_templates'), where('connectionId', '==', connectionId))
+      : collection(db, 'whatsapp_templates');
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WhatsappTemplate));
+  },
+
+  async saveWhatsappTemplate(template: WhatsappTemplate) {
+    const { id, ...data } = template;
+    await setDoc(doc(db, 'whatsapp_templates', id), data);
+  },
+
+  async deleteWhatsappTemplate(id: string) {
+    await deleteDoc(doc(db, 'whatsapp_templates', id));
+  },
+
   deleteLead: async (id: string) => {
     await deleteDoc(doc(db, COLLECTIONS.LEADS, id));
   },
@@ -300,9 +317,23 @@ export const api = {
     const allLeads = await api.getLeads();
     const leads = allLeads.filter(l => leadIds.includes(l.id));
     
+    // Buscar template se houver
+    let templateData = undefined;
+    if (campaign.channel === 'whatsapp' && campaign.whatsappTemplateId) {
+      const tplSnap = await getDoc(doc(db, 'whatsapp_templates', campaign.whatsappTemplateId));
+      if (tplSnap.exists()) {
+        const tpl = tplSnap.data() as WhatsappTemplate;
+        templateData = {
+          name: tpl.name,
+          language: tpl.language || 'pt_BR',
+          components: tpl.components || []
+        };
+      }
+    }
+
     const newItems: FilaEnvio[] = [];
     for (const lead of leads) {
-      const item: FilaEnvio = {
+      const item: any = {
         id: Math.random().toString(36).substr(2, 9),
         campanhaId,
         leadId: lead.id,
@@ -312,7 +343,9 @@ export const api = {
         status: 'pendente',
         tentativa: 0,
         dataAgendada: new Date().toISOString(),
-        prioridade: 1
+        prioridade: 1,
+        whatsappConnectionId: campaign.whatsappConnectionId,
+        templateData: templateData
       };
       await setDoc(doc(db, COLLECTIONS.QUEUE, item.id), item);
       newItems.push(item);

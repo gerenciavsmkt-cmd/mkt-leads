@@ -36,6 +36,7 @@ export default function CampanhasPage() {
   const [selectedCampaignHtml, setSelectedCampaignHtml] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [whatsappConnections, setWhatsappConnections] = useState<any[]>([]);
+  const [whatsappTemplates, setWhatsappTemplates] = useState<any[]>([]);
   const [segmentations, setSegmentations] = useState<any[]>([]);
   
   // Custom Delete Confirm State
@@ -76,6 +77,7 @@ export default function CampanhasPage() {
     botaoLink: '',
     channel: 'email' as 'email' | 'whatsapp',
     whatsappConnectionId: '',
+    whatsappTemplateId: '',
     segmentId: '',
     tipoEnvio: 'imediato' as 'imediato' | 'agendado',
     dataAgendada: ''
@@ -85,6 +87,7 @@ export default function CampanhasPage() {
     const loadData = async () => {
       setCampaigns(await api.getCampaigns());
       setWhatsappConnections(await api.getWhatsappConnections());
+      setWhatsappTemplates(await api.getWhatsappTemplates());
       setSegmentations(await api.getSegmentations());
     };
     loadData();
@@ -306,7 +309,8 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
       totalPendentes: existingCampaign?.totalPendentes || 0,
       totalErro: existingCampaign?.totalErro || 0,
       totalAbertos: existingCampaign?.totalAbertos || 0,
-      totalCliques: existingCampaign?.totalCliques || 0
+      totalCliques: existingCampaign?.totalCliques || 0,
+      whatsappTemplateId: newCampaign.whatsappTemplateId
     } as Campaign;
     
     await api.saveCampaign(campaign);
@@ -520,23 +524,52 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
                   onChange={e => setNewCampaign({...newCampaign, assunto: e.target.value})}
                 />
               </div>
-              {newCampaign.channel === 'whatsapp' && (
+            </div>
+
+            {newCampaign.channel === 'whatsapp' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>Conexão WhatsApp</label>
+                  <label className="label">Conexão WhatsApp</label>
                   <select 
+                    required
                     className="btn-outline" 
-                    style={{ width: '100%', height: '42px', padding: '0 1rem', background: 'white' }}
+                    style={{ width: '100%', height: '44px', padding: '0 1rem' }}
                     value={newCampaign.whatsappConnectionId}
-                    onChange={e => setNewCampaign({...newCampaign, whatsappConnectionId: e.target.value})}
+                    onChange={(e) => setNewCampaign({...newCampaign, whatsappConnectionId: e.target.value})}
                   >
-                    <option value="">Usar Conexão Principal</option>
+                    <option value="">Selecione uma conexão...</option>
                     {whatsappConnections.map(conn => (
-                      <option key={conn.id} value={conn.id}>{conn.name} ({conn.phoneNumber || 'Sem número'})</option>
+                      <option key={conn.id} value={conn.id}>{conn.name} ({conn.type === 'meta_official' ? 'Meta' : 'Evolution'})</option>
                     ))}
                   </select>
                 </div>
-              )}
-            </div>
+                {whatsappConnections.find(c => c.id === newCampaign.whatsappConnectionId)?.type === 'meta_official' && (
+                  <div>
+                    <label className="label">Modelo (Template)</label>
+                    <select 
+                      required
+                      className="btn-outline" 
+                      style={{ width: '100%', height: '44px', padding: '0 1rem' }}
+                      value={newCampaign.whatsappTemplateId}
+                      onChange={(e) => {
+                        const tplId = e.target.value;
+                        const tpl = whatsappTemplates.find(t => t.id === tplId);
+                        setNewCampaign({
+                          ...newCampaign, 
+                          whatsappTemplateId: tplId,
+                          textoSimples: tpl?.content || newCampaign.textoSimples
+                        });
+                      }}
+                    >
+                      <option value="">Selecione um modelo aprovado...</option>
+                      {whatsappTemplates.filter(t => t.connectionId === newCampaign.whatsappConnectionId).map(tpl => (
+                        <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
               <div>

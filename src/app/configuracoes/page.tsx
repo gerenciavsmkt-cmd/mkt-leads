@@ -615,6 +615,136 @@ export default function ConfigPage() {
                 </button>
               </div>
             </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
+
+            <div style={{ padding: '1rem', background: 'rgba(0, 0, 0, 0.05)', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.1)' }}>
+               <p style={{ fontSize: '0.85rem', color: '#000', lineHeight: 1.5 }}>
+                 <strong>TikTok Business API:</strong> Conecte sua conta Business para receber e responder mensagens diretas.
+               </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok App ID</label>
+                <input 
+                  type="text" 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                  value={settings.omnichannel?.tiktokAppId || ''}
+                  onChange={e => setSettings({
+                    ...settings, 
+                    omnichannel: { ...settings.omnichannel, tiktokAppId: e.target.value }
+                  })}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok Access Token</label>
+                <input 
+                  type="password" 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                  value={settings.omnichannel?.tiktokAccessToken || ''}
+                  onChange={e => setSettings({
+                    ...settings, 
+                    omnichannel: { ...settings.omnichannel, tiktokAccessToken: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
+
+            <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+               <p style={{ fontSize: '0.85rem', color: '#ef4444', lineHeight: 1.5 }}>
+                 <strong>YouTube API (Comentários):</strong> Integre comentários de vídeos como mensagens no Inbox.
+               </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>YouTube API Key (Busca de Comentários)</label>
+                <input 
+                  type="password" 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                  value={settings.omnichannel?.youtubeApiKey || ''}
+                  onChange={e => setSettings({
+                    ...settings, 
+                    omnichannel: { ...settings.omnichannel, youtubeApiKey: e.target.value }
+                  })}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>YouTube Channel ID</label>
+                <input 
+                  type="text" 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
+                  value={settings.omnichannel?.youtubeChannelId || ''}
+                  onChange={e => setSettings({
+                    ...settings, 
+                    omnichannel: { ...settings.omnichannel, youtubeChannelId: e.target.value }
+                  })}
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '0.5rem' }}>
+              <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>Configuração para RESPOSTAS (OAuth2)</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', fontWeight: 500 }}>Google Client ID</label>
+                  <input 
+                    type="text" 
+                    className="btn-outline" 
+                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.8rem' }} 
+                    value={settings.omnichannel?.youtubeClientId || ''}
+                    onChange={e => setSettings({
+                      ...settings, 
+                      omnichannel: { ...settings.omnichannel, youtubeClientId: e.target.value }
+                    })}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', fontWeight: 500 }}>Google Client Secret</label>
+                  <input 
+                    type="password" 
+                    className="btn-outline" 
+                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.8rem' }} 
+                    value={settings.omnichannel?.youtubeClientSecret || ''}
+                    onChange={e => setSettings({
+                      ...settings, 
+                      omnichannel: { ...settings.omnichannel, youtubeClientSecret: e.target.value }
+                    })}
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button 
+                  className="btn btn-primary"
+                  style={{ height: '36px', fontSize: '0.8rem' }}
+                  onClick={async () => {
+                    if (!settings.omnichannel?.youtubeClientId || !settings.omnichannel?.youtubeClientSecret) {
+                      alert('Por favor, insira o Client ID e Client Secret primeiro.');
+                      return;
+                    }
+                    // Salvar primeiro para garantir que os IDs estão no banco
+                    await api.saveSettings(settings);
+                    window.location.href = '/api/auth/youtube';
+                  }}
+                >
+                  <Globe size={14} /> Conectar Canal do YouTube
+                </button>
+                {settings.omnichannel?.youtubeRefreshToken && (
+                  <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>✓ Conectado</span>
+                )}
+              </div>
+              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem' }}>
+                Redirect URI para o Google Cloud: <code style={{ background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>{typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/youtube` : '.../api/auth/callback/youtube'}</code>
+              </p>
+            </div>
           </div>
         </section>
 

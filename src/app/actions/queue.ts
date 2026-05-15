@@ -140,12 +140,13 @@ export async function processQueueServerAction() {
         if (!targetPhone) {
           sendResult = { success: false, message: 'Lead sem telefone cadastrado.' };
         } else {
-          const message = campaign.textoSimples || campaign.assunto; // Usa textoSimples ou assunto se o texto tiver vazio
+          const message = (campaign.textoSimples || campaign.assunto || '').replace(/\{\{nome\}\}/g, lead.nome);
           const result = await sendOmnichannelMessageAction(
             targetPhone, 
             'whatsapp', 
-            message.replace(/\{\{nome\}\}/g, lead.nome),
-            campaign.whatsappConnectionId
+            message,
+            item.whatsappConnectionId,
+            item.templateData
           );
           sendResult = { success: result.success, message: result.error };
         }

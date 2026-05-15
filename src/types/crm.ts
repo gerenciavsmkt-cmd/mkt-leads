@@ -39,6 +39,7 @@ export interface Campaign {
   channel: 'email' | 'whatsapp';
   whatsappConnectionId?: string;
   segmentId?: string;
+  whatsappTemplateId?: string;
   totalLeads: number;
   totalEnviados: number;
   totalPendentes: number;
@@ -63,6 +64,11 @@ export interface FilaEnvio {
   erroMensagem?: string | null;
   loteNumero?: number;
   prioridade: number;
+  templateData?: {
+    name: string;
+    language: string;
+    components?: any[];
+  };
 }
 
 export type LandingPageTemplate = 'professional' | 'lead-magnet' | 'vsl' | 'minimalist' | 'event' | 'coupon' | 'offers';
@@ -164,6 +170,16 @@ export interface Settings {
     evolutionApiUrl?: string; // URL base da Evolution API
     evolutionApiKey?: string; // Global API Key
     evolutionInstanceName?: string;
+    tiktokAccessToken?: string;
+    tiktokAppId?: string;
+    tiktokAppSecret?: string;
+    youtubeApiKey?: string;
+    youtubeChannelId?: string;
+    youtubeClientId?: string;
+    youtubeClientSecret?: string;
+    youtubeRefreshToken?: string;
+    youtubeAccessToken?: string;
+    youtubeTokenExpiry?: string;
   };
   notificacoes?: {
     novosLeads?: boolean;
@@ -285,6 +301,18 @@ export interface PopupConfig {
 export type WhatsappConnectionType = 'meta_official' | 'evolution_api';
 export type WhatsappConnectionStatus = 'connected' | 'disconnected' | 'qr_code_ready' | 'pending';
 
+export interface WhatsappTemplate {
+  id: string;
+  connectionId: string;
+  name: string;          // Nome de referência na Meta (ex: boas_vindas_leads)
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  language: string;      // ex: pt_BR
+  content: string;       // O texto para visualização no CRM
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'UNKNOWN';
+  components?: any[];    // Estrutura completa da Meta
+  dataCriacao: string;
+}
+
 export interface WhatsappConnection {
   id: string;
   name: string;
@@ -294,6 +322,7 @@ export interface WhatsappConnection {
   
   // Para API Oficial da Meta
   metaPhoneNumberId?: string;
+  metaWabaId?: string; // ID da conta Business (WABA)
   metaAccessToken?: string;
 
   // Para Evolution API
@@ -306,7 +335,7 @@ export interface WhatsappConnection {
 }
 
 // --- OMNICHANNEL / CHAT ---
-export type ChannelType = 'whatsapp' | 'instagram' | 'facebook' | 'tiktok' | 'system';
+export type ChannelType = 'whatsapp' | 'instagram' | 'facebook' | 'tiktok' | 'youtube' | 'system';
 
 export interface ChatMessage {
   id: string;
