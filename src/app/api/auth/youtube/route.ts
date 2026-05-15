@@ -12,17 +12,10 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Client ID not configured', { status: 400 });
     }
 
-    let origin = new URL(req.url).origin;
+    const host = req.headers.get('host') || new URL(req.url).host;
+    const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = `${protocol}://${host}`;
     
-    // Correção para 0.0.0.0 ou protocolos incorretos em ambiente de dev
-    if (origin.includes('0.0.0.0')) {
-      origin = origin.replace('0.0.0.0', 'localhost');
-    }
-    // Google não aceita HTTPS em localhost exceto com certificado real
-    if (origin.includes('localhost') && origin.startsWith('https')) {
-      origin = origin.replace('https', 'http');
-    }
-
     const redirectUri = `${origin}/api/auth/callback/youtube`;
     const scope = 'https://www.googleapis.com/auth/youtube.force-ssl';
     

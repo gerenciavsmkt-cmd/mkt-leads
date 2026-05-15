@@ -21,9 +21,9 @@ export async function GET(req: NextRequest) {
     
     const clientId = settings.omnichannel?.youtubeClientId;
     const clientSecret = settings.omnichannel?.youtubeClientSecret;
-    let origin = new URL(req.url).origin;
-    if (origin.includes('0.0.0.0')) origin = origin.replace('0.0.0.0', 'localhost');
-    if (origin.includes('localhost') && origin.startsWith('https')) origin = origin.replace('https', 'http');
+    const host = req.headers.get('host') || new URL(req.url).host;
+    const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = `${protocol}://${host}`;
 
     const redirectUri = `${origin}/api/auth/callback/youtube`;
 
