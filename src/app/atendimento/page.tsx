@@ -41,7 +41,7 @@ import { ChatSession, ChatMessage, Lead } from '@/types/crm';
 import { api } from '@/services/api';
 import { db, storage } from '@/lib/firebase';
 import { sendOmnichannelMessageAction } from '@/app/actions/chat';
-import { collection, query, where, orderBy, onSnapshot, doc, getDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, getDocs, deleteDoc, updateDoc, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const META_TEMPLATES = [

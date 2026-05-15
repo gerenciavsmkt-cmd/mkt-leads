@@ -82,6 +82,7 @@ export default function Dashboard() {
         totalLeads: statsData.totalLeads,
         totalCampaigns: statsData.totalCampaigns,
         pendentes: statsData.pendentes,
+        leadsHoje: statsData.leadsHoje,
         enviadosHoje: sentToday,
         limiteRestante: realCredits
       }));

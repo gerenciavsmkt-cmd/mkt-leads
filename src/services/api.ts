@@ -84,7 +84,7 @@ const initialSettings: Settings = {
 export const api = {
   // Leads
   getLeads: async (limitCount: number = 1000): Promise<Lead[]> => {
-    const q = query(collection(db, COLLECTIONS.LEADS), orderBy('dataUltimaAtividade', 'desc'), firestoreLimit(limitCount));
+    const q = query(collection(db, COLLECTIONS.LEADS), orderBy('dataCriacao', 'desc'), firestoreLimit(limitCount));
     const querySnapshot = await getDocs(q);
     const leads: Lead[] = [];
     querySnapshot.forEach((doc) => {
@@ -730,14 +730,19 @@ export const api = {
     const campaignsRef = collection(db, COLLECTIONS.CAMPAIGNS);
     const queueRef = collection(db, COLLECTIONS.QUEUE);
 
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
     const [
       totalLeadsSnap,
       totalCampaignsSnap,
       pendentesQueueSnap,
+      leadsHojeSnap
     ] = await Promise.all([
       getCountFromServer(leadsRef),
       getCountFromServer(campaignsRef),
-      getCountFromServer(query(queueRef, where('status', '==', 'pendente')))
+      getCountFromServer(query(queueRef, where('status', '==', 'pendente'))),
+      getCountFromServer(query(leadsRef, where('dataCriacao', '>=', todayStr), where('dataCriacao', '<=', todayStr + '\uf8ff')))
     ]);
 
     // Buscar últimos 5 leads e 4 campanhas para o dashboard
@@ -753,6 +758,7 @@ export const api = {
       totalLeads: totalLeadsSnap.data().count,
       totalCampaigns: totalCampaignsSnap.data().count,
       pendentes: pendentesQueueSnap.data().count,
+      leadsHoje: leadsHojeSnap.data().count,
       recentLeads,
       recentCampaigns
     };
