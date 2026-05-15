@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     for (const item of comments) {
       const snippet = item.snippet.topLevelComment.snippet;
-      const commentId = item.id;
+      const commentId = item.snippet.topLevelComment.id;
       const authorId = snippet.authorChannelId.value;
       const authorName = snippet.authorDisplayName;
       const authorAvatar = snippet.authorProfileImageUrl;
@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
             lastTimestamp: timestamp,
             unreadCount: 1,
             status: 'active',
+            lastPlatformMessageId: commentId,
             dataCriacao: new Date().toISOString()
           });
         } else {
@@ -80,7 +81,8 @@ export async function GET(req: NextRequest) {
             lastMessage: text,
             lastTimestamp: timestamp,
             unreadCount: (chatSnap.data()?.unreadCount || 0) + 1,
-            status: 'active'
+            status: 'active',
+            lastPlatformMessageId: commentId
           });
         }
 

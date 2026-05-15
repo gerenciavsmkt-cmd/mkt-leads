@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore';
 
 export async function sendOmnichannelMessageAction(
   recipientIdOrPhone: string, 

@@ -205,6 +205,10 @@ function AtendimentoContent() {
           }
         }
 
+        if (chat.channel === 'youtube' && chat.lastPlatformMessageId) {
+          recipient = chat.lastPlatformMessageId;
+        }
+
         const result = await sendOmnichannelMessageAction(
           recipient, 
           chat.channel,
