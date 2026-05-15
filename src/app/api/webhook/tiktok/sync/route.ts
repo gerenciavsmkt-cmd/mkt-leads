@@ -1,60 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc } from 'firebase/firestore';
-import { ChatSession } from '@/types/crm';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 export async function GET(req: NextRequest) {
   try {
     const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
     const settings = settingsSnap.exists() ? settingsSnap.data() : {};
     
-    const accessToken = settings.omnichannel?.tiktokAccessToken;
+    let accessToken = settings.omnichannel?.tiktokAccessToken;
+    const refreshToken = settings.omnichannel?.tiktokRefreshToken;
+    const expiry = settings.omnichannel?.tiktokTokenExpiry;
+    const clientKey = settings.omnichannel?.tiktokAppId;
+    const clientSecret = settings.omnichannel?.tiktokClientSecret;
 
-    if (!accessToken) {
-      return NextResponse.json({ success: false, message: 'TikTok Access Token não configurado.' }, { status: 400 });
+    if (!accessToken && !refreshToken) {
+      return NextResponse.json({ success: false, message: 'TikTok não conectado.' }, { status: 400 });
     }
 
-    // 1. Buscar vídeos da conta (limitando aos últimos para performance)
-    // Nota: O TikTok Business API requer o business_id para alguns endpoints. 
-    // Se não tivermos, tentaremos usar os endpoints que aceitam apenas o token.
-    const videosRes = await fetch(`https://business-api.tiktok.com/open_api/v1.3/business/video/list/`, {
-      headers: { 'Access-Token': accessToken }
+    // Refresh Token se expirado
+    const isExpired = !expiry || new Date(expiry).getTime() < Date.now() + 60000;
+    if (isExpired && refreshToken && clientKey && clientSecret) {
+      const formData = new URLSearchParams();
+      formData.append('client_key', clientKey);
+      formData.append('client_secret', clientSecret);
+      formData.append('refresh_token', refreshToken);
+      formData.append('grant_type', 'refresh_token');
+
+      const refreshResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData,
+      });
+      const refreshData = await refreshResponse.json();
+      if (refreshResponse.ok) {
+        accessToken = refreshData.access_token;
+        await updateDoc(doc(db, 'settings', 'global'), {
+          'omnichannel.tiktokAccessToken': accessToken,
+          'omnichannel.tiktokRefreshToken': refreshData.refresh_token,
+          'omnichannel.tiktokTokenExpiry': new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+        });
+      }
+    }
+
+    // 1. Buscar vídeos da conta (API V2)
+    const videosRes = await fetch(`https://open.tiktokapis.com/v2/video/list/`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_count: 10 })
     });
 
     const videosData = await videosRes.json();
-    if (!videosRes.ok || videosData.code !== 0) {
-      console.error('TikTok API Error (Videos):', videosData);
-      return NextResponse.json({ success: false, message: videosData.message || 'Erro ao buscar vídeos do TikTok' }, { status: 500 });
+    if (!videosRes.ok || videosData.error) {
+      return NextResponse.json({ success: false, message: videosData.error?.message || 'Erro ao buscar vídeos' }, { status: 500 });
     }
 
-    const videos = videosData.data.list || [];
+    const videos = videosData.data?.videos || [];
     let newMessages = 0;
 
     // 2. Para cada vídeo, buscar comentários
     for (const video of videos) {
-      const videoId = video.video_id;
+      const videoId = video.id;
       
-      const commentsRes = await fetch(`https://business-api.tiktok.com/open_api/v1.3/business/comment/list/?video_id=${videoId}`, {
-        headers: { 'Access-Token': accessToken }
+      const commentsRes = await fetch(`https://open.tiktokapis.com/v2/video/comment/list/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, max_count: 20 })
       });
 
       const commentsData = await commentsRes.json();
-      if (!commentsRes.ok || commentsData.code !== 0) continue;
+      if (!commentsRes.ok || commentsData.error) continue;
 
-      const comments = commentsData.data.list || [];
+      const comments = commentsData.data?.comments || [];
 
       for (const comment of comments) {
-        const commentId = comment.comment_id;
-        const authorId = comment.user_id;
-        const authorName = comment.username || `User ${authorId.substring(0, 5)}`;
+        const commentId = comment.id;
+        const authorId = comment.user_id || `user_${videoId}`;
+        const authorName = comment.username || 'TikTok User';
         const text = comment.text;
         const timestamp = new Date(comment.create_time * 1000).toISOString();
 
-        // Agrupamos por ID do comentário principal (thread)
         const chatId = `tiktok_${commentId}`;
         const chatRef = doc(db, 'atendimentos_v3', chatId);
         
-        // Evitar duplicidade
         const msgId = `tiktok_msg_${commentId}`;
         const msgCheck = await getDoc(doc(db, 'messages', msgId));
         if (msgCheck.exists()) continue;
@@ -72,8 +99,6 @@ export async function GET(req: NextRequest) {
             dataCriacao: timestamp,
             tags: ['tiktok', 'omnichannel']
           });
-        } else {
-          await updateDoc(leadRef, { dataUltimaAtividade: timestamp });
         }
 
         // Garantir Sessão de Chat
@@ -92,18 +117,9 @@ export async function GET(req: NextRequest) {
             lastVideoId: videoId,
             dataCriacao: timestamp
           });
-        } else {
-          await updateDoc(chatRef, {
-            lastMessage: text,
-            lastTimestamp: timestamp,
-            unreadCount: (chatSnap.data()?.unreadCount || 0) + 1,
-            status: 'active',
-            lastPlatformMessageId: commentId,
-            lastVideoId: videoId
-          });
         }
 
-        // Salvar Mensagem com ID fixo para evitar duplicidade
+        // Salvar Mensagem
         await setDoc(doc(db, 'messages', msgId), {
           id: msgId,
           chatId: chatId,

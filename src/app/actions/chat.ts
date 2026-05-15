@@ -161,25 +161,52 @@ export async function sendOmnichannelMessageAction(
     if (channel === 'tiktok') {
       const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
       const settings = settingsSnap.exists() ? settingsSnap.data() : {};
-      const token = settings.omnichannel?.tiktokAccessToken;
+      
+      let accessToken = settings.omnichannel?.tiktokAccessToken;
+      const refreshToken = settings.omnichannel?.tiktokRefreshToken;
+      const expiry = settings.omnichannel?.tiktokTokenExpiry;
+      const clientKey = settings.omnichannel?.tiktokAppId;
+      const clientSecret = settings.omnichannel?.tiktokClientSecret;
 
-      if (!token) {
-        return { success: false, error: 'Token do TikTok não configurado.' };
+      if (!accessToken && !refreshToken) {
+        return { success: false, error: 'TikTok não conectado. Vá em Configurações.' };
       }
 
-      // Buscar a sessão de chat para ver se temos um videoId e commentId (indicando que é um comentário)
-      // Como o recipientIdOrPhone agora é o commentId (na nova lógica de sync), 
-      // ou o leadId (na lógica antiga de DM), precisamos checar.
-      
-      const isCommentReply = recipientIdOrPhone.startsWith('7') || recipientIdOrPhone.length > 15; // IDs de comentário do TikTok são longos
+      // Refresh Token se expirado
+      const isExpired = !expiry || new Date(expiry).getTime() < Date.now() + 60000;
+      if (isExpired && refreshToken && clientKey && clientSecret) {
+        console.log('>>> Refreshing TikTok Token...');
+        const formData = new URLSearchParams();
+        formData.append('client_key', clientKey);
+        formData.append('client_secret', clientSecret);
+        formData.append('refresh_token', refreshToken);
+        formData.append('grant_type', 'refresh_token');
+
+        const refreshResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData,
+        });
+        const refreshData = await refreshResponse.json();
+        if (refreshResponse.ok) {
+          accessToken = refreshData.access_token;
+          await updateDoc(doc(db, 'settings', 'global'), {
+            'omnichannel.tiktokAccessToken': accessToken,
+            'omnichannel.tiktokRefreshToken': refreshData.refresh_token,
+            'omnichannel.tiktokTokenExpiry': new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+          });
+        }
+      }
+
+      const isCommentReply = recipientIdOrPhone.length > 15; // Simplificação para identificar IDs de comentário
 
       if (isCommentReply) {
-        // Enviar como RESPOSTA DE COMENTÁRIO
-        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/business/comment/reply/`, {
+        // Enviar como RESPOSTA DE COMENTÁRIO (API V2)
+        const response = await fetch(`https://open.tiktokapis.com/v2/video/comment/reply/`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Token': token
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({
             comment_id: recipientIdOrPhone,
@@ -188,18 +215,18 @@ export async function sendOmnichannelMessageAction(
         });
 
         const data = await response.json();
-        if (data.code !== 0) {
+        if (!response.ok || data.error) {
           console.error('TikTok Comment Reply Error:', data);
-          return { success: false, error: data.message || 'Erro ao responder comentário no TikTok' };
+          return { success: false, error: data.error?.message || 'Erro ao responder comentário no TikTok' };
         }
         return { success: true, data };
       } else {
-        // Enviar como MENSAGEM DIRETA (DM)
-        const response = await fetch(`https://business-api.tiktok.com/open_api/v1.3/business/message/send/`, {
+        // Enviar como MENSAGEM DIRETA (DM - Requer Business API ou Scopes específicos)
+        const response = await fetch(`https://open.tiktokapis.com/v2/message/send/`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Access-Token': token
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({
             recipient_id: recipientIdOrPhone,
@@ -209,7 +236,7 @@ export async function sendOmnichannelMessageAction(
         });
 
         const data = await response.json();
-        return response.ok ? { success: true, data } : { success: false, error: data.message || 'Erro na API do TikTok' };
+        return response.ok ? { success: true, data } : { success: false, error: data.error?.message || 'Erro na API do TikTok' };
       }
     }
 

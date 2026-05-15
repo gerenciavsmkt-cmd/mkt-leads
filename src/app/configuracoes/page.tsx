@@ -656,7 +656,7 @@ export default function ConfigPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok App ID</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok App ID (Client Key)</label>
                 <input 
                   type="text" 
                   className="btn-outline" 
@@ -669,19 +669,42 @@ export default function ConfigPage() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok Access Token</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>TikTok Client Secret</label>
                 <input 
                   type="password" 
                   className="btn-outline" 
                   style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
-                  value={settings.omnichannel?.tiktokAccessToken || ''}
+                  value={settings.omnichannel?.tiktokClientSecret || ''}
                   onChange={e => setSettings({
                     ...settings, 
-                    omnichannel: { ...settings.omnichannel, tiktokAccessToken: e.target.value }
+                    omnichannel: { ...settings.omnichannel, tiktokClientSecret: e.target.value }
                   })}
                 />
               </div>
             </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+              <button 
+                className="btn btn-primary"
+                style={{ height: '36px', fontSize: '0.8rem', background: '#000' }}
+                onClick={async () => {
+                  if (!settings.omnichannel?.tiktokAppId || !settings.omnichannel?.tiktokClientSecret) {
+                    alert('Por favor, insira o App ID e Client Secret primeiro.');
+                    return;
+                  }
+                  await api.saveSettings(settings);
+                  window.location.href = '/api/auth/tiktok';
+                }}
+              >
+                <Share2 size={14} /> Conectar Conta do TikTok
+              </button>
+              {settings.omnichannel?.tiktokRefreshToken && (
+                <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>✓ Conectado</span>
+              )}
+            </div>
+            <p style={{ fontSize: '0.7rem', color: '#64748b' }}>
+              Redirect URI: <code style={{ background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>{typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/tiktok` : '.../api/auth/callback/tiktok'}</code>
+            </p>
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
 
