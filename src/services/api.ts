@@ -83,7 +83,7 @@ const initialSettings: Settings = {
 
 export const api = {
   // Leads
-  getLeads: async (limitCount: number = 1000): Promise<Lead[]> => {
+  getLeads: async (limitCount: number = 5000): Promise<Lead[]> => {
     const q = query(collection(db, COLLECTIONS.LEADS), orderBy('dataCriacao', 'desc'), firestoreLimit(limitCount));
     const querySnapshot = await getDocs(q);
     const leads: Lead[] = [];
