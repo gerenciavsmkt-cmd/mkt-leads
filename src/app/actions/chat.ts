@@ -226,6 +226,7 @@ export async function sendOmnichannelMessageAction(
       }
 
       // Enviar Resposta
+      console.log(`>>> Enviando Resposta YouTube: parentId=${recipientIdOrPhone}, text=${text}`);
       const response = await fetch(`https://www.googleapis.com/youtube/v3/comments?part=snippet`, {
         method: 'POST',
         headers: { 
@@ -241,6 +242,12 @@ export async function sendOmnichannelMessageAction(
       });
 
       const data = await response.json();
+      console.log('>>> Resposta da API do YouTube:', JSON.stringify(data));
+
+      if (!response.ok) {
+        console.error('>>> Erro na API do YouTube Detalhado:', data.error);
+      }
+
       return response.ok ? { success: true, data } : { success: false, error: data.error?.message || 'Erro ao postar comentário' };
     }
 
