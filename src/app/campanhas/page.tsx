@@ -35,6 +35,8 @@ export default function CampanhasPage() {
   const [isGeneratingIA, setIsGeneratingIA] = useState(false);
   const [selectedCampaignHtml, setSelectedCampaignHtml] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [whatsappConnections, setWhatsappConnections] = useState<any[]>([]);
+  const [segmentations, setSegmentations] = useState<any[]>([]);
   
   // Custom Delete Confirm State
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -72,6 +74,9 @@ export default function CampanhasPage() {
     bannerImg: '',
     botaoTexto: '',
     botaoLink: '',
+    channel: 'email' as 'email' | 'whatsapp',
+    whatsappConnectionId: '',
+    segmentId: '',
     tipoEnvio: 'imediato' as 'imediato' | 'agendado',
     dataAgendada: ''
   });
@@ -79,6 +84,8 @@ export default function CampanhasPage() {
   useEffect(() => {
     const loadData = async () => {
       setCampaigns(await api.getCampaigns());
+      setWhatsappConnections(await api.getWhatsappConnections());
+      setSegmentations(await api.getSegmentations());
     };
     loadData();
   }, []);
@@ -306,7 +313,21 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
     setCampaigns(await api.getCampaigns());
     setIsCreating(false);
     setEditingId(null);
-    setNewCampaign({ nome: '', assunto: '', preheader: '', conteudoHtml: '', textoSimples: '', bannerImg: '', botaoTexto: '', botaoLink: '', tipoEnvio: 'imediato', dataAgendada: '' });
+    setNewCampaign({ 
+      nome: '', 
+      assunto: '', 
+      preheader: '', 
+      conteudoHtml: '', 
+      textoSimples: '', 
+      bannerImg: '', 
+      botaoTexto: '', 
+      botaoLink: '', 
+      channel: 'email',
+      whatsappConnectionId: '',
+      segmentId: '',
+      tipoEnvio: 'imediato', 
+      dataAgendada: '' 
+    });
   };
 
   const handleEdit = (campaign: Campaign) => {
@@ -319,6 +340,9 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
       bannerImg: campaign.bannerImg || '',
       botaoTexto: campaign.botaoTexto || '',
       botaoLink: campaign.botaoLink || '',
+      channel: campaign.channel || 'email',
+      whatsappConnectionId: campaign.whatsappConnectionId || '',
+      segmentId: campaign.segmentId || '',
       tipoEnvio: campaign.status === 'agendada' ? 'agendado' : 'imediato',
       dataAgendada: campaign.dataAgendada || ''
     });
@@ -329,7 +353,16 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
   };
 
   const startCampaign = async (campaign: Campaign) => {
-    const leads = await api.getLeads();
+    const allLeads = await api.getLeads();
+    let leads = allLeads;
+    
+    if (campaign.segmentId) {
+      const segment = segmentations.find(s => s.id === campaign.segmentId);
+      if (segment) {
+        leads = allLeads.filter(l => segment.leadIds.includes(l.id));
+      }
+    }
+
     const queue = await api.generateQueueForCampaign(campaign.id, leads.map(l => l.id));
     
     const updatedCampaign: Campaign = {
@@ -348,7 +381,7 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
     setAlertModal({
       isOpen: true,
       title: 'Disparo Iniciado',
-      message: `Sucesso! Fila de envio gerada com ${queue.length} e-mails. O processamento começou.`
+      message: `Sucesso! Fila de envio gerada com ${queue.length} mensagens. O processamento começou.`
     });
   };
 
@@ -384,8 +417,8 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
     <div>
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>Campanhas de E-mail</h2>
-          <p style={{ opacity: 0.6 }}>Crie e monitore seus envios em massa.</p>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>Gerenciamento de Campanhas</h2>
+          <p style={{ opacity: 0.6 }}>Crie e monitore seus envios em massa via E-mail e WhatsApp.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {isProcessingQueue && (
@@ -412,21 +445,40 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
         <div className="card" style={{ marginBottom: '2.5rem', border: '2px solid var(--primary)' }}>
           <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '1.25rem' }}>{editingId ? 'Editar Campanha' : 'Nova Campanha Profissional'}</h3>
-            <div className="btn-group" style={{ display: 'flex', background: 'var(--accent)', padding: '4px', borderRadius: '8px' }}>
-               <button 
-                 className={`btn ${viewMode === 'normal' ? 'btn-primary' : ''}`} 
-                 style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
-                 onClick={() => setViewMode('normal')}
-               >
-                 <Type size={14} /> Normal
-               </button>
-               <button 
-                 className={`btn ${viewMode === 'html' ? 'btn-primary' : ''}`} 
-                 style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
-                 onClick={() => setViewMode('html')}
-               >
-                 <Code size={14} /> HTML
-               </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="btn-group" style={{ display: 'flex', background: 'var(--accent)', padding: '4px', borderRadius: '8px' }}>
+                <button 
+                  className={`btn ${newCampaign.channel === 'email' ? 'btn-primary' : ''}`} 
+                  style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
+                  onClick={() => setNewCampaign({...newCampaign, channel: 'email'})}
+                >
+                  <Send size={14} /> E-mail
+                </button>
+                <button 
+                  className={`btn ${newCampaign.channel === 'whatsapp' ? 'btn-primary' : ''}`} 
+                  style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
+                  onClick={() => setNewCampaign({...newCampaign, channel: 'whatsapp'})}
+                >
+                  <Smartphone size={14} /> WhatsApp
+                </button>
+              </div>
+              <div className="btn-group" style={{ display: 'flex', background: 'var(--accent)', padding: '4px', borderRadius: '8px' }}>
+                 <button 
+                   className={`btn ${viewMode === 'normal' ? 'btn-primary' : ''}`} 
+                   style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
+                   onClick={() => setViewMode('normal')}
+                 >
+                   <Type size={14} /> Normal
+                 </button>
+                 <button 
+                   className={`btn ${viewMode === 'html' ? 'btn-primary' : ''}`} 
+                   style={{ height: '32px', fontSize: '0.8rem', padding: '0 1rem' }}
+                   onClick={() => setViewMode('html')}
+                   disabled={newCampaign.channel === 'whatsapp'}
+                 >
+                   <Code size={14} /> HTML
+                 </button>
+              </div>
             </div>
           </header>
 
@@ -444,16 +496,46 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>Assunto do E-mail</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>Público Alvo (Segmentação)</label>
+                <select 
+                  className="btn-outline" 
+                  style={{ width: '100%', height: '42px', padding: '0 1rem', background: 'white' }}
+                  value={newCampaign.segmentId}
+                  onChange={e => setNewCampaign({...newCampaign, segmentId: e.target.value})}
+                >
+                  <option value="">Todos os Leads</option>
+                  {segmentations.map(seg => (
+                    <option key={seg.id} value={seg.id}>{seg.nome} ({seg.leadIds?.length || 0} leads)</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>{newCampaign.channel === 'email' ? 'Assunto do E-mail' : 'Título da Campanha'}</label>
                 <input 
                   type="text" 
                   className="btn-outline" 
                   style={{ width: '100%', height: '42px', padding: '0 1rem' }} 
-                  placeholder="Ex: Você não pode perder essa!"
+                  placeholder={newCampaign.channel === 'email' ? "Ex: Você não pode perder essa!" : "Ex: Promoção Exclusiva WhatsApp"}
                   value={newCampaign.assunto}
                   onChange={e => setNewCampaign({...newCampaign, assunto: e.target.value})}
                 />
               </div>
+              {newCampaign.channel === 'whatsapp' && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>Conexão WhatsApp</label>
+                  <select 
+                    className="btn-outline" 
+                    style={{ width: '100%', height: '42px', padding: '0 1rem', background: 'white' }}
+                    value={newCampaign.whatsappConnectionId}
+                    onChange={e => setNewCampaign({...newCampaign, whatsappConnectionId: e.target.value})}
+                  >
+                    <option value="">Usar Conexão Principal</option>
+                    {whatsappConnections.map(conn => (
+                      <option key={conn.id} value={conn.id}>{conn.name} ({conn.phoneNumber || 'Sem número'})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
@@ -598,7 +680,7 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
               <button className="btn btn-primary" onClick={handleCreate} style={{ padding: '0 2rem' }}>{editingId ? 'Salvar Alterações' : 'Salvar Campanha'}</button>
-              <button className="btn btn-outline" onClick={() => { setIsCreating(false); setEditingId(null); setNewCampaign({ nome: '', assunto: '', preheader: '', conteudoHtml: '', textoSimples: '', bannerImg: '', botaoTexto: '', botaoLink: '', tipoEnvio: 'imediato', dataAgendada: '' }); }}>Cancelar</button>
+              <button className="btn btn-outline" onClick={() => { setIsCreating(false); setEditingId(null); setNewCampaign({ nome: '', assunto: '', preheader: '', conteudoHtml: '', textoSimples: '', bannerImg: '', botaoTexto: '', botaoLink: '', channel: 'email', whatsappConnectionId: '', tipoEnvio: 'imediato', dataAgendada: '' }); }}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -611,9 +693,14 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
           <div key={campaign.id} className="card">
             {/* ... o resto do card mantido como original ... */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <div>
-                <h4 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{campaign.nome}</h4>
-                <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>Assunto: {campaign.assunto}</p>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: campaign.channel === 'whatsapp' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(99, 102, 241, 0.1)', color: campaign.channel === 'whatsapp' ? '#22c55e' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                   {campaign.channel === 'whatsapp' ? <Smartphone size={24} /> : <Send size={24} />}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{campaign.nome}</h4>
+                  <p style={{ fontSize: '0.875rem', opacity: 0.6 }}>{campaign.channel === 'email' ? 'Assunto: ' : 'Mensagem: '}{campaign.assunto}</p>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                 <button 
@@ -628,10 +715,14 @@ ${campaignId ? `<img src="${systemUrl}/api/track?type=open&campaignId=${campaign
                 <button 
                   className="btn btn-outline" 
                   style={{ width: '38px', height: '38px', padding: 0 }}
-                  title="Visualizar E-mail"
+                  title={campaign.channel === 'whatsapp' ? "Visualizar Mensagem" : "Visualizar E-mail"}
                   onClick={() => {
-                    setSelectedCampaignHtml(campaign.conteudoHtml);
-                    setIsPreviewOpen(true);
+                    if (campaign.channel === 'whatsapp') {
+                      alert(`Mensagem do WhatsApp:\n\n${campaign.textoSimples || campaign.assunto}`);
+                    } else {
+                      setSelectedCampaignHtml(campaign.conteudoHtml);
+                      setIsPreviewOpen(true);
+                    }
                   }}
                 >
                   <Eye size={18} />

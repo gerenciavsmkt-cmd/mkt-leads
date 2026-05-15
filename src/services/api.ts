@@ -293,6 +293,10 @@ export const api = {
   },
 
   generateQueueForCampaign: async (campanhaId: string, leadIds: string[]) => {
+    const campaigns = await api.getCampaigns();
+    const campaign = campaigns.find(c => c.id === campanhaId);
+    if (!campaign) throw new Error('Campanha não encontrada');
+
     const allLeads = await api.getLeads();
     const leads = allLeads.filter(l => leadIds.includes(l.id));
     
@@ -302,7 +306,9 @@ export const api = {
         id: Math.random().toString(36).substr(2, 9),
         campanhaId,
         leadId: lead.id,
-        email: lead.email,
+        email: campaign.channel === 'email' ? lead.email : undefined,
+        telefone: campaign.channel === 'whatsapp' ? (lead.celular || lead.telefone) : undefined,
+        channel: campaign.channel,
         status: 'pendente',
         tentativa: 0,
         dataAgendada: new Date().toISOString(),

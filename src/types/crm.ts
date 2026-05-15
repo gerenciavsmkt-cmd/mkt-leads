@@ -36,6 +36,9 @@ export interface Campaign {
   botaoTexto?: string;
   botaoLink?: string;
   status: CampaignStatus;
+  channel: 'email' | 'whatsapp';
+  whatsappConnectionId?: string;
+  segmentId?: string;
   totalLeads: number;
   totalEnviados: number;
   totalPendentes: number;
@@ -50,7 +53,9 @@ export interface FilaEnvio {
   id: string;
   campanhaId: string;
   leadId: string;
-  email: string;
+  email?: string;
+  telefone?: string;
+  channel: 'email' | 'whatsapp';
   status: QueueStatus;
   tentativa: number;
   dataAgendada: string;

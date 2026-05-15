@@ -14,8 +14,10 @@ import {
 import { FilaEnvio, Campaign, Settings, Lead } from '@/types/crm';
 import { sendEmailBrevoAction, getBrevoCreditsAction } from './brevo';
 
+import { sendOmnichannelMessageAction } from './chat';
+
 /**
- * Processa a fila de e-mails no servidor.
+ * Processa a fila de e-mails e whatsapp no servidor.
  * Pode ser chamado via UI ou via Cron Job.
  */
 export async function processQueueServerAction() {
@@ -26,8 +28,6 @@ export async function processQueueServerAction() {
     const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
     if (!settingsSnap.exists()) return { success: false, message: 'Configurações não encontradas.' };
     const settings = settingsSnap.data() as Settings;
-
-    if (!settings.brevoApiKey) return { success: false, message: 'API Key do Brevo não configurada.' };
 
     // 2. Verificar Campanhas Agendadas que já devem começar
     const now = new Date().toISOString();
@@ -40,25 +40,24 @@ export async function processQueueServerAction() {
     for (const campaignDoc of scheduledSnap.docs) {
       const camp = campaignDoc.data() as Campaign;
       if (camp.dataAgendada && camp.dataAgendada <= now) {
-        console.log(`Iniciando campanha agendada: ${camp.nome}`);
+        console.log(`Iniciando campanha agendada: ${camp.nome} (${camp.channel})`);
         
         // Buscar todos os leads
         const leadsSnap = await getDocs(collection(db, 'leads'));
-        const leadIds: string[] = [];
-        leadsSnap.forEach(d => leadIds.push(d.id));
+        const leads: Lead[] = [];
+        leadsSnap.forEach(d => leads.push({ id: d.id, ...d.data() } as Lead));
 
         // Gerar fila para esta campanha
-        for (const leadId of leadIds) {
+        for (const lead of leads) {
           const queueId = Math.random().toString(36).substr(2, 9);
-          const leadSnap = await getDoc(doc(db, 'leads', leadId));
-          if (!leadSnap.exists()) continue;
-          const leadData = leadSnap.data() as Lead;
-
+          
           await setDoc(doc(db, 'queue', queueId), {
             id: queueId,
             campanhaId: camp.id,
-            leadId: leadId,
-            email: leadData.email,
+            leadId: lead.id,
+            email: camp.channel === 'email' ? lead.email : undefined,
+            telefone: camp.channel === 'whatsapp' ? (lead.celular || lead.telefone) : undefined,
+            channel: camp.channel,
             status: 'pendente',
             tentativa: 0,
             dataAgendada: now,
@@ -69,22 +68,10 @@ export async function processQueueServerAction() {
         // Atualizar status da campanha para em execução
         await updateDoc(doc(db, 'campaigns', camp.id), {
           status: 'em execução',
-          totalLeads: leadIds.length,
-          totalPendentes: leadIds.length
+          totalLeads: leads.length,
+          totalPendentes: leads.length
         });
       }
-    }
-
-    // 3. Verificar limite real no Brevo
-    const brevoCredits = await getBrevoCreditsAction(settings.brevoApiKey);
-    
-    // O limite real de processamento é o que o Brevo permite MENOS uma margem de 20 para cupons,
-    // limitado também pelo máximo configurado pelo usuário (280).
-    const dailyConfig = settings.limiteDiario || 280;
-    const remainingLimit = Math.min(brevoCredits - 20, dailyConfig);
-
-    if (remainingLimit <= 0) {
-      return { success: false, message: `Limite diário de campanhas atingido ou em margem de reserva (Disponível no Brevo: ${brevoCredits}, Reservado: 20).` };
     }
 
     // 3. Buscar itens pendentes na fila
@@ -102,14 +89,17 @@ export async function processQueueServerAction() {
       }
     });
 
-    // Pegar apenas o que cabe no limite
-    pendingItems = pendingItems.slice(0, remainingLimit);
+    // Limite diário (para e-mail ainda é importante)
+    const dailyConfig = settings.limiteDiario || 280;
+    
+    // Pegar apenas o que cabe no limite (simplificado: limitando total, mas whatsapp poderia ter limite diferente)
+    pendingItems = pendingItems.slice(0, dailyConfig);
 
     if (pendingItems.length === 0) {
-      return { success: true, message: 'Nenhum e-mail pendente para processar.' };
+      return { success: true, message: 'Nenhum item pendente para processar.' };
     }
 
-    console.log(`Processando ${pendingItems.length} e-mails com intervalo de 5s...`);
+    console.log(`Processando ${pendingItems.length} itens na fila...`);
 
     // 4. Buscar Campanhas e Leads necessários para o processamento
     const campaignsSnap = await getDocs(collection(db, 'campaigns'));
@@ -130,17 +120,38 @@ export async function processQueueServerAction() {
 
       // Incrementar tentativa
       const tentativaAtual = (item.tentativa || 0) + 1;
+      let sendResult: { success: boolean; message?: string } = { success: false };
 
-      // Enviar e-mail via Brevo
-      const result = await sendEmailBrevoAction({
-        apiKey: settings.brevoApiKey,
-        sender: { name: settings.remetenteNome, email: settings.remetenteEmail },
-        to: [{ email: lead.email, name: lead.nome }],
-        subject: campaign.assunto,
-        htmlContent: campaign.conteudoHtml.replace(/\{\{nome\}\}/g, lead.nome)
-      });
+      if (item.channel === 'email') {
+        if (!settings.brevoApiKey) {
+          sendResult = { success: false, message: 'API Key do Brevo não configurada.' };
+        } else {
+          const result = await sendEmailBrevoAction({
+            apiKey: settings.brevoApiKey,
+            sender: { name: settings.remetenteNome, email: settings.remetenteEmail },
+            to: [{ email: lead.email, name: lead.nome }],
+            subject: campaign.assunto,
+            htmlContent: campaign.conteudoHtml.replace(/\{\{nome\}\}/g, lead.nome)
+          });
+          sendResult = { success: result.success, message: result.message };
+        }
+      } else if (item.channel === 'whatsapp') {
+        const targetPhone = lead.celular || lead.telefone;
+        if (!targetPhone) {
+          sendResult = { success: false, message: 'Lead sem telefone cadastrado.' };
+        } else {
+          const message = campaign.textoSimples || campaign.assunto; // Usa textoSimples ou assunto se o texto tiver vazio
+          const result = await sendOmnichannelMessageAction(
+            targetPhone, 
+            'whatsapp', 
+            message.replace(/\{\{nome\}\}/g, lead.nome),
+            campaign.whatsappConnectionId
+          );
+          sendResult = { success: result.success, message: result.error };
+        }
+      }
 
-      if (result.success) {
+      if (sendResult.success) {
         await updateDoc(doc(db, 'queue', item.id), {
           status: 'enviado',
           dataEnvio: new Date().toISOString(),
@@ -152,20 +163,18 @@ export async function processQueueServerAction() {
         await updateDoc(doc(db, 'queue', item.id), {
           status: 'erro',
           tentativa: tentativaAtual,
-          erroMensagem: result.message
+          erroMensagem: sendResult.message || 'Erro desconhecido'
         });
       }
 
       // Atualizar estatísticas da campanha
-      // Nota: Para escala, isso deve ser feito via transação ou função agregadora, 
-      // mas para este CRM simplificado, atualizamos aqui.
       const campaignRef = doc(db, 'campaigns', campaign.id);
       const updatedCampSnap = await getDoc(campaignRef);
       if (updatedCampSnap.exists()) {
         const campData = updatedCampSnap.data() as Campaign;
-        const totalEnviados = result.success ? (campData.totalEnviados + 1) : campData.totalEnviados;
+        const totalEnviados = sendResult.success ? (campData.totalEnviados + 1) : campData.totalEnviados;
         const totalPendentes = Math.max(0, campData.totalPendentes - 1);
-        const totalErro = (!result.success && tentativaAtual >= 3) ? (campData.totalErro + 1) : campData.totalErro;
+        const totalErro = (!sendResult.success && tentativaAtual >= 3) ? (campData.totalErro + 1) : campData.totalErro;
         
         await updateDoc(campaignRef, {
           totalEnviados,
@@ -175,15 +184,16 @@ export async function processQueueServerAction() {
         });
       }
 
-      // Intervalo de 5 segundos entre envios conforme pedido pelo usuário
+      // Intervalo entre envios (5s para e-mail, talvez 10s para WhatsApp para evitar ban)
+      const delay = item.channel === 'whatsapp' ? 10000 : 5000;
       if (processedCount < pendingItems.length) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     return { 
       success: true, 
-      message: `Processamento concluído. ${processedCount} e-mails enviados.` 
+      message: `Processamento concluído. ${processedCount} itens enviados.` 
     };
 
   } catch (error: any) {

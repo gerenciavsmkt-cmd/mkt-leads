@@ -147,7 +147,6 @@ tbody tr:hover {
 .main-content {
   flex: 1;
   padding: 2rem;
-  max-width: 1400px;
 }
 
 .sidebar {
