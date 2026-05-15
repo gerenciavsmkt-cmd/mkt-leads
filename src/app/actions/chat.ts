@@ -199,7 +199,13 @@ export async function sendOmnichannelMessageAction(
         return { success: false, error: 'YouTube OAuth2 não configurado (Falta conectar o canal).' };
       }
 
-      // Refresh Token se expirado (ou perto de expirar)
+      // Validação básica: IDs de autor do YouTube geralmente começam com UC. 
+      // Se o recipient começar com UC, ele provavelmente é o autor e não o comentário.
+      if (recipientIdOrPhone.startsWith('UC')) {
+        return { success: false, error: 'Aguarde a próxima sincronização. O ID do comentário ainda não foi mapeado para este lead.' };
+      }
+
+      // Refresh Token se expirado
       const isExpired = !expiry || new Date(expiry).getTime() < Date.now() + 60000;
       if (isExpired) {
         console.log('>>> Refreshing YouTube Token...');
@@ -227,18 +233,22 @@ export async function sendOmnichannelMessageAction(
 
       // Enviar Resposta
       console.log(`>>> Enviando Resposta YouTube: parentId=${recipientIdOrPhone}, text=${text}`);
+      
+      const body: any = {
+        snippet: {
+          parentId: recipientIdOrPhone,
+          textOriginal: text
+        }
+      };
+
       const response = await fetch(`https://www.googleapis.com/youtube/v3/comments?part=snippet`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${accessToken}`,
+          'User-Agent': 'GerencyLeads-CRM/1.0'
         },
-        body: JSON.stringify({
-          snippet: {
-            parentId: recipientIdOrPhone, // O ID do comentário original
-            textOriginal: text
-          }
-        })
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
@@ -246,9 +256,10 @@ export async function sendOmnichannelMessageAction(
 
       if (!response.ok) {
         console.error('>>> Erro na API do YouTube Detalhado:', data.error);
+        return { success: false, error: data.error?.message || 'Erro ao postar comentário' };
       }
 
-      return response.ok ? { success: true, data } : { success: false, error: data.error?.message || 'Erro ao postar comentário' };
+      return { success: true, data };
     }
 
     return { success: false, error: 'Canal desconhecido.' };

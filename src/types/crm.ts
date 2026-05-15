@@ -364,5 +364,6 @@ export interface ChatSession {
   status: 'active' | 'archived';
   assignedTo?: string; // ID do atendente
   lastPlatformMessageId?: string; // ID da mensagem na plataforma de origem (ex: commentId no YouTube)
+  lastVideoId?: string; // ID do vídeo (para o YouTube)
   dataCriacao: string;
 }

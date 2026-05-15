@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
             unreadCount: 1,
             status: 'active',
             lastPlatformMessageId: commentId,
+            lastVideoId: item.snippet.videoId,
             dataCriacao: new Date().toISOString()
           });
         } else {
@@ -82,7 +83,8 @@ export async function GET(req: NextRequest) {
             lastTimestamp: timestamp,
             unreadCount: (chatSnap.data()?.unreadCount || 0) + 1,
             status: 'active',
-            lastPlatformMessageId: commentId
+            lastPlatformMessageId: commentId,
+            lastVideoId: item.snippet.videoId
           });
         }
 
