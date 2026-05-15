@@ -190,9 +190,7 @@ export default function LeadsPage() {
       onResolve: async () => {
         setConfirmModal(prev => ({ ...prev, loading: true }));
         try {
-          for (const id of selectedLeads) {
-            await api.deleteLead(id);
-          }
+          await api.deleteLeadsBulk(selectedLeads);
           setSelectedLeads([]);
           await refreshLeads();
         } finally {
@@ -347,25 +345,22 @@ export default function LeadsPage() {
     setImportAnalysis(prev => ({ ...prev, loading: true }));
     
     try {
-      // Processar Criações
-      for (const data of importAnalysis.toCreate) {
-        await api.saveLead({
+      const allLeadsToProcess: Lead[] = [
+        ...importAnalysis.toCreate.map(data => ({
           ...data,
           id: Math.random().toString(36).substr(2, 9),
           dataCriacao: new Date().toISOString(),
-          status: 'novo',
-          consentimentoLGPD: true
-        });
-      }
-
-      // Processar Atualizações
-      for (const item of importAnalysis.toUpdate) {
-        await api.saveLead({
+          status: 'novo' as LeadStatus,
+          consentimentoLGPD: true,
+          tags: data.tags || []
+        })),
+        ...importAnalysis.toUpdate.map(item => ({
           ...item.lead,
-          ...item.updates,
-          id: item.lead.id // Mantém o ID original
-        });
-      }
+          ...item.updates
+        }))
+      ];
+
+      await api.saveLeadsBulk(allLeadsToProcess);
 
       alert('Importação concluída com sucesso!');
       setIsImportPreviewOpen(false);

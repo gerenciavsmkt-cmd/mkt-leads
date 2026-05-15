@@ -15,7 +15,8 @@ import {
   setDoc,
   orderBy,
   limit as firestoreLimit,
-  increment
+  increment,
+  writeBatch
 } from 'firebase/firestore';
 
 const COLLECTIONS = {
@@ -81,19 +82,14 @@ const initialSettings: Settings = {
 
 export const api = {
   // Leads
-  getLeads: async (): Promise<Lead[]> => {
-    const querySnapshot = await getDocs(collection(db, COLLECTIONS.LEADS));
+  getLeads: async (limitCount: number = 1000): Promise<Lead[]> => {
+    const q = query(collection(db, COLLECTIONS.LEADS), orderBy('dataUltimaAtividade', 'desc'), firestoreLimit(limitCount));
+    const querySnapshot = await getDocs(q);
     const leads: Lead[] = [];
     querySnapshot.forEach((doc) => {
-      // Garantimos que o ID do documento seja o ID usado no objeto, 
-      // sobrescrevendo qualquer campo 'id' que venha do doc.data()
       leads.push({ ...doc.data(), id: doc.id } as Lead);
     });
-    return leads.sort((a, b) => {
-      const dateA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
-      const dateB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
-      return dateB - dateA;
-    });
+    return leads;
   },
   
   saveLead: async (lead: Lead) => {
@@ -188,6 +184,34 @@ export const api = {
 
   deleteLead: async (id: string) => {
     await deleteDoc(doc(db, COLLECTIONS.LEADS, id));
+  },
+
+  deleteLeadsBulk: async (ids: string[]) => {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+      batch.delete(doc(db, COLLECTIONS.LEADS, id));
+    });
+    await batch.commit();
+  },
+
+  saveLeadsBulk: async (leads: Lead[]) => {
+    // Processar em chunks de 500 (limite do Firestore)
+    const chunks = [];
+    for (let i = 0; i < leads.length; i += 500) {
+      chunks.push(leads.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(lead => {
+        const leadRef = doc(db, COLLECTIONS.LEADS, lead.id);
+        batch.set(leadRef, {
+          ...lead,
+          dataUltimaAtividade: new Date().toISOString()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
   },
 
   // Campaigns
@@ -314,8 +338,14 @@ export const api = {
     const campaign = campaigns.find(c => c.id === campanhaId);
     if (!campaign) throw new Error('Campanha não encontrada');
 
-    const allLeads = await api.getLeads();
-    const leads = allLeads.filter(l => leadIds.includes(l.id));
+    // Buscar apenas os leads necessários em chunks de 30 (limite do 'in' no Firestore)
+    const leads: Lead[] = [];
+    for (let i = 0; i < leadIds.length; i += 30) {
+      const chunk = leadIds.slice(i, i + 30);
+      const q = query(collection(db, COLLECTIONS.LEADS), where('__name__', 'in', chunk));
+      const snap = await getDocs(q);
+      snap.forEach(doc => leads.push({ ...doc.data(), id: doc.id } as Lead));
+    }
     
     // Buscar template se houver
     let templateData = undefined;
@@ -331,7 +361,9 @@ export const api = {
       }
     }
 
+    const batch = writeBatch(db);
     const newItems: FilaEnvio[] = [];
+    
     for (const lead of leads) {
       const item: any = {
         id: Math.random().toString(36).substr(2, 9),
@@ -347,9 +379,11 @@ export const api = {
         whatsappConnectionId: campaign.whatsappConnectionId,
         templateData: templateData
       };
-      await setDoc(doc(db, COLLECTIONS.QUEUE, item.id), item);
+      batch.set(doc(db, COLLECTIONS.QUEUE, item.id), item);
       newItems.push(item);
     }
+    
+    await batch.commit();
     return newItems;
   },
 
