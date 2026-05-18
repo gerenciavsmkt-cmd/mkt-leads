@@ -385,8 +385,8 @@ export default function LeadsPage() {
   const filteredLeads = leads.filter(lead => {
     // Busca inteligente (Nome, Empresa, E-mail ou Contato)
     const matchesSearch = 
-      lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (lead.empresa || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (lead.telefone || '').includes(searchTerm) ||
       (lead.celular || '').includes(searchTerm);

@@ -87,8 +87,8 @@ export default function UsuariosPage() {
   };
 
   const filteredUsers = users.filter(user => 
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const pendingCount = users.filter(u => u.status === 'pending').length;

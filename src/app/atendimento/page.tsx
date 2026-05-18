@@ -347,9 +347,9 @@ function AtendimentoContent() {
   };
 
   const filteredChats = chats.filter(chat => 
-    chat.leadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.leadId.includes(searchQuery)
+    (chat.leadName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (chat.lastMessage || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (chat.leadId || '').includes(searchQuery)
   );
 
   const activeChat = chats.find(c => c.id === selectedChatId);
