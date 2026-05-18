@@ -25,9 +25,7 @@ export async function GET(req: NextRequest) {
     // Scopes necessários para ler e responder comentários
     const scope = [
       'user.info.basic',
-      'video.list',
-      'comment.list',
-      'comment.publish'
+      'video.list'
     ].join(',');
 
     const authUrl = `https://www.tiktok.com/v2/auth/authorize/?` +
