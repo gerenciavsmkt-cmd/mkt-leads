@@ -5,6 +5,8 @@ import { api } from '@/services/api';
 import { Lead, Campaign, FilaEnvio } from '@/types/crm';
 import { useRouter } from 'next/navigation';
 import { getBrevoCreditsAction } from '@/app/actions/brevo';
+import { collection, onSnapshot, query, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { 
   Users, 
   Mail, 
@@ -71,28 +73,82 @@ export default function Dashboard() {
     else if (hour < 18) setGreeting('Boa tarde');
     else setGreeting('Boa noite');
 
+    let unsubLeads: any;
+    let unsubCampaigns: any;
+    let unsubQueue: any;
+
     const fetchAll = async () => {
-      const statsData = await api.getDashboardStats();
-      const sentToday = await api.getSentTodayCount();
-      const settings = await api.getSettings();
-      const realCredits = await getBrevoCreditsAction(settings.brevoApiKey);
-      
+      // Initialize default empty state to ensure rawData is always defined
+      let initialStats = { totalLeads: 0, totalCampaigns: 0, pendentes: 0, leadsHoje: 0, recentLeads: [] as Lead[], recentCampaigns: [] as Campaign[] };
+      let sentToday = 0;
+      let realCredits = 0;
+
+      try {
+        initialStats = await api.getDashboardStats();
+      } catch (err) {
+        console.error("Erro ao buscar stats iniciais:", err);
+      }
+
+      try {
+        sentToday = await api.getSentTodayCount();
+      } catch (err) {
+        console.error("Erro ao buscar envios de hoje:", err);
+      }
+
+      try {
+        const settings = await api.getSettings();
+        realCredits = await getBrevoCreditsAction(settings.brevoApiKey);
+      } catch (err) {
+        console.error("Erro ao buscar créditos brevo:", err);
+      }
+
       setStats(prev => ({
         ...prev,
-        totalLeads: statsData.totalLeads,
-        totalCampaigns: statsData.totalCampaigns,
-        pendentes: statsData.pendentes,
-        leadsHoje: statsData.leadsHoje,
+        totalLeads: initialStats.totalLeads,
+        totalCampaigns: initialStats.totalCampaigns,
+        pendentes: initialStats.pendentes,
+        leadsHoje: initialStats.leadsHoje,
         enviadosHoje: sentToday,
         limiteRestante: realCredits
       }));
 
-      setRecentLeads(statsData.recentLeads);
-      setRecentCampaigns(statsData.recentCampaigns);
-      setRawData({ leads: statsData.recentLeads, campaigns: statsData.recentCampaigns, queue: [], sentToday, realCredits });
+      setRecentLeads(initialStats.recentLeads);
+      setRecentCampaigns(initialStats.recentCampaigns);
+      setRawData({ leads: initialStats.recentLeads, campaigns: initialStats.recentCampaigns, queue: [], sentToday, realCredits });
+
+      // Setup Real-time Listeners (onSnapshot) to keep dashboard dynamically updated
+      try {
+        const leadsQ = query(collection(db, 'leads'), orderBy('dataCriacao', 'desc'), firestoreLimit(1000));
+        unsubLeads = onSnapshot(leadsQ, (snap) => {
+          const latestLeads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead));
+          setRawData(prev => prev ? { ...prev, leads: latestLeads } : { leads: latestLeads, campaigns: [], queue: [], sentToday: 0, realCredits: 0 });
+        });
+      } catch (err) { console.error("Erro listener leads:", err); }
+
+      try {
+        const campQ = query(collection(db, 'campaigns'), orderBy('dataCriacao', 'desc'), firestoreLimit(100));
+        unsubCampaigns = onSnapshot(campQ, (snap) => {
+          const latestCamps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign));
+          setRawData(prev => prev ? { ...prev, campaigns: latestCamps } : null);
+        });
+      } catch (err) { console.error("Erro listener campanhas:", err); }
+
+      try {
+        const queueQ = query(collection(db, 'queue'), orderBy('dataEnvio', 'desc'), firestoreLimit(200));
+        unsubQueue = onSnapshot(queueQ, (snap) => {
+          const latestQueue = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FilaEnvio));
+          setRawData(prev => prev ? { ...prev, queue: latestQueue } : null);
+        });
+      } catch (err) { console.error("Erro listener queue:", err); }
     };
 
     fetchAll();
+
+    return () => {
+      if (unsubLeads) unsubLeads();
+      if (unsubCampaigns) unsubCampaigns();
+      if (unsubQueue) unsubQueue();
+    };
   }, []);
 
   useEffect(() => {
@@ -165,6 +221,11 @@ export default function Dashboard() {
       case 'perdido': return 'var(--danger)';
       default: return '#cbd5e1';
     }
+  };
+
+  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Placeholder to prevent undefined error if user clicks it
+    setImportStatus('Funcionalidade de importação movida para a tela de Leads.');
   };
 
   const getStatusPercent = (count: number) => {
