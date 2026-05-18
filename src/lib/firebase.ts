@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -15,7 +20,19 @@ import { getStorage } from 'firebase/storage';
 
 // Singleton to avoid re-initializing during hot reloads in development
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+
+// Inicializa o Firestore com cache persistente no lado do cliente
+let db;
+if (typeof window !== 'undefined') {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager() // Compartilha o cache de forma segura entre várias abas
+    })
+  });
+} else {
+  db = getFirestore(app);
+}
+
 const auth = getAuth(app);
 const storage = getStorage(app);
 
