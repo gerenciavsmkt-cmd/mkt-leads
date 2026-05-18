@@ -15,19 +15,19 @@ export default function PrivacyPolicy() {
         <p style={{ marginBottom: '1rem' }}>
           O <strong>Gerency Leads</strong> ("nós", "nosso") respeita a sua privacidade e está comprometido em proteger as suas informações pessoais. 
           Esta Política de Privacidade descreve como coletamos, usamos, armazenamos e compartilhamos os seus dados quando você utiliza nossa plataforma 
-          e nossas integrações, incluindo a integração com os aplicativos e serviços da Meta (Facebook, Instagram, Messenger).
+          e nossas integrações, incluindo a integração com plataformas de terceiros, redes sociais e aplicativos de mensagens parceiros.
         </p>
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>2. Informações que Coletamos da Meta</h2>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>2. Informações que Coletamos de Plataformas de Terceiros</h2>
         <p style={{ marginBottom: '1rem' }}>
-          Ao conectar sua conta do Facebook ou Instagram ao Gerency Leads, podemos solicitar acesso a informações específicas através das APIs da Meta para 
+          Ao conectar suas contas de redes sociais ou plataformas de mensagens ao Gerency Leads, podemos solicitar acesso a informações específicas através das APIs destas plataformas para 
           fornecer nossos serviços de gestão de atendimento omnichannel. Os dados coletados incluem:
         </p>
         <ul style={{ listStyleType: 'disc', paddingLeft: '2rem', marginBottom: '1rem' }}>
-          <li>Informações públicas do perfil (Nome, foto de perfil).</li>
-          <li>Conteúdo de mensagens diretas enviadas para sua página do Facebook ou conta comercial do Instagram, estritamente para o propósito de gerenciamento do atendimento via nossa caixa de entrada (Inbox).</li>
+          <li>Informações públicas do perfil (nome, foto de perfil, etc.).</li>
+          <li>Conteúdo de mensagens diretas enviadas para suas contas conectadas, estritamente para o propósito de gerenciamento do atendimento via nossa caixa de entrada (Inbox).</li>
           <li>Tokens de autenticação seguros para manter a conexão entre a plataforma e suas contas sociais.</li>
         </ul>
       </section>
@@ -38,7 +38,7 @@ export default function PrivacyPolicy() {
         <ul style={{ listStyleType: 'disc', paddingLeft: '2rem', marginBottom: '1rem' }}>
           <li>Permitir que você visualize e responda a mensagens de seus clientes (leads) diretamente pelo painel do Gerency Leads.</li>
           <li>Fornecer métricas e relatórios gerenciais sobre o volume de atendimento.</li>
-          <li>Garantir o funcionamento técnico e seguro da integração entre os nossos sistemas e os da Meta.</li>
+          <li>Garantir o funcionamento técnico e seguro da integração entre os nossos sistemas e os das plataformas parceiras.</li>
         </ul>
         <p style={{ marginBottom: '1rem' }}>
           <strong>Importante:</strong> Não usamos o conteúdo das mensagens dos seus clientes para fins de publicidade direcionada, nem o vendemos ou compartilhamos com terceiros para quaisquer outros fins não relacionados à prestação do nosso serviço de CRM.
@@ -64,11 +64,11 @@ export default function PrivacyPolicy() {
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>6. Seus Direitos (Deleção de Dados)</h2>
         <p style={{ marginBottom: '1rem' }}>
-          Conforme exigido pelos Termos da Plataforma da Meta e legislações de proteção de dados aplicáveis, você tem o direito de solicitar a remoção de seus dados.
-          Se você desejar que removamos a sua integração com a Meta e apaguemos todos os dados associados a ela, você pode:
+          Conforme exigido pelas Políticas das plataformas parceiras e legislações de proteção de dados aplicáveis, você tem o direito de solicitar a remoção de seus dados.
+          Se você desejar que removamos as suas integrações e apaguemos todos os dados associados a elas, você pode:
         </p>
         <ul style={{ listStyleType: 'disc', paddingLeft: '2rem', marginBottom: '1rem' }}>
-          <li>Desconectar o aplicativo "Gerency Leads" acessando as configurações de "Integrações de Negócios" no seu perfil do Facebook.</li>
+          <li>Desconectar o aplicativo "Gerency Leads" acessando as configurações de integrações e segurança na respectiva plataforma de terceiro conectada.</li>
           <li>Solicitar a exclusão total da sua conta e dos dados através do suporte direto na nossa plataforma.</li>
         </ul>
       </section>

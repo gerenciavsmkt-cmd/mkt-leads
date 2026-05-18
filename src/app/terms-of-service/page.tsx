@@ -22,19 +22,19 @@ export default function TermsOfService() {
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>2. Descrição do Serviço</h2>
         <p style={{ marginBottom: '1rem' }}>
           O Gerency Leads é uma plataforma de CRM e automação de marketing que fornece ferramentas para captura de leads, disparo de campanhas, 
-          páginas de captura e atendimento omnichannel (integrando mensagens de redes sociais, como o ecossistema Meta - Facebook e Instagram).
+          páginas de captura e atendimento omnichannel (integrando mensagens de redes sociais e plataformas de comunicação de terceiros).
         </p>
       </section>
 
       <section style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>3. Uso da Integração com a Meta</h2>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>3. Uso das Integrações de Terceiros</h2>
         <p style={{ marginBottom: '1rem' }}>
-          Para oferecer os recursos de caixa de entrada unificada (Inbox), nosso serviço permite a integração com APIs da Meta. Ao ativar esta integração:
+          Para oferecer os recursos de caixa de entrada unificada (Inbox), nosso serviço permite a integração com APIs de redes sociais e plataformas parceiras. Ao ativar estas integrações:
         </p>
         <ul style={{ listStyleType: 'disc', paddingLeft: '2rem', marginBottom: '1rem' }}>
-          <li>Você nos concede permissão para ler, gerenciar e enviar mensagens em nome de suas Páginas do Facebook e Contas do Instagram vinculadas, estritamente dentro dos limites operacionais do Gerency Leads.</li>
+          <li>Você nos concede permissão para ler, gerenciar e enviar mensagens em nome das suas contas conectadas, estritamente dentro dos limites operacionais do Gerency Leads.</li>
           <li>Você declara ser o administrador ou ter autorização legal para conectar tais contas ao nosso sistema.</li>
-          <li>Você concorda em cumprir todas as Políticas do Desenvolvedor da Meta e as Políticas do WhatsApp/Instagram Business ao interagir com seus clientes.</li>
+          <li>Você concorda em cumprir todas as Políticas de Desenvolvedor e Termos de Serviço das respectivas plataformas parceiras ao interagir com seus clientes.</li>
         </ul>
       </section>
 
