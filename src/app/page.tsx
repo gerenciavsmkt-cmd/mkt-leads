@@ -65,7 +65,7 @@ export default function Dashboard() {
   const [period, setPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [rawData, setRawData] = useState<{ leads: Lead[], campaigns: Campaign[], queue: FilaEnvio[], sentToday: number, realCredits: number } | null>(null);
+  const [rawData, setRawData] = useState<{ leads: Lead[], campaigns: Campaign[], queue: FilaEnvio[], sentToday: number, realCredits: number, serverTotalLeads?: number } | null>(null);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -114,7 +114,7 @@ export default function Dashboard() {
 
       setRecentLeads(initialStats.recentLeads);
       setRecentCampaigns(initialStats.recentCampaigns);
-      setRawData({ leads: initialStats.recentLeads, campaigns: initialStats.recentCampaigns, queue: [], sentToday, realCredits });
+      setRawData({ leads: initialStats.recentLeads, campaigns: initialStats.recentCampaigns, queue: [], sentToday, realCredits, serverTotalLeads: initialStats.totalLeads });
 
       // Setup Real-time Listeners (onSnapshot) to keep dashboard dynamically updated
       try {
@@ -154,7 +154,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!rawData) return;
 
-    const { leads, campaigns, queue, sentToday, realCredits } = rawData;
+    const { leads, campaigns, queue, sentToday, realCredits, serverTotalLeads } = rawData;
     const now = new Date();
     let limitDate = new Date(0);
     let endDate = new Date(now);
@@ -200,7 +200,7 @@ export default function Dashboard() {
     };
 
     setStats({
-      totalLeads: filteredLeads.length,
+      totalLeads: period === 'all' && serverTotalLeads ? Math.max(filteredLeads.length, serverTotalLeads) : filteredLeads.length,
       leadsHoje: leadsHoje, // leadsHoje is absolute for today regardless of filter (or could be relative, but "hoje" is constant)
       totalCampaigns: filteredCampaigns.length,
       enviadosHoje: sentToday,
