@@ -13,7 +13,7 @@ export default function TermsOfService() {
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a' }}>1. Aceitação dos Termos</h2>
         <p style={{ marginBottom: '1rem' }}>
-          Ao acessar e utilizar o sistema <strong>Gerency Leads</strong>, você concorda em cumprir e ficar vinculado aos seguintes Termos de Serviço. 
+          Ao acessar e utilizar o aplicativo <strong>Gerência de leads CRM</strong> (acessível através do site mkt.ciasuper.com.br e também conhecido como Gerency Leads), você concorda em cumprir e ficar vinculado aos seguintes Termos de Serviço. 
           Se você não concordar com qualquer parte destes termos, você não deve usar nossa plataforma.
         </p>
       </section>
