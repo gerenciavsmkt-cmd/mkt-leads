@@ -387,6 +387,16 @@ export default function LoginPage() {
               {isRegister ? 'Fazer Login' : 'Solicitar Acesso'}
             </button>
           </p>
+
+          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.75rem' }}>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255, 255, 255, 0.4)', textDecoration: 'underline' }}>
+              Termos de Serviço
+            </a>
+            <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>|</span>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255, 255, 255, 0.4)', textDecoration: 'underline' }}>
+              Política de Privacidade
+            </a>
+          </div>
         </div>
       </div>
 
