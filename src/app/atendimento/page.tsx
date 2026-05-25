@@ -241,9 +241,22 @@ function AtendimentoContent() {
 
     try {
       setUploading(true);
-      const fileRef = ref(storage, `chats/${selectedChatId}/${Date.now()}_${file.name}`);
-      await uploadBytes(fileRef, file);
-      const url = await getDownloadURL(fileRef);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('chatId', selectedChatId);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Falha no upload do servidor.');
+      }
+
+      const { url } = await response.json();
 
       const msg: ChatMessage = {
         id: Math.random().toString(36).substr(2, 9),
