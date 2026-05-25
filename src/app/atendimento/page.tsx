@@ -236,7 +236,8 @@ function AtendimentoContent() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedChatId || !selectedChat) return;
+    const chat = chats.find(c => c.id === selectedChatId);
+    if (!file || !selectedChatId || !chat) return;
 
     try {
       setUploading(true);
