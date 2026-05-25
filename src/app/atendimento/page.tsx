@@ -115,18 +115,19 @@ function AtendimentoContent() {
 
     const q = query(
       collection(db, 'messages'),
-      where('chatId', '==', selectedChatId),
-      orderBy('timestamp', 'desc'),
-      limit(50)
+      where('chatId', '==', selectedChatId)
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const msgList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
       
-      // Ordenar para exibição (as 50 mais recentes em ordem cronológica)
+      // Ordenar por data mais antiga primeiro para a ordem da conversa
       msgList.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       
-      setMessages(msgList);
+      // Limitar às 50 mensagens mais recentes
+      const limitedMsgs = msgList.slice(-50);
+      
+      setMessages(limitedMsgs);
       
       // Marcar como lido
       api.markChatAsRead(selectedChatId);
