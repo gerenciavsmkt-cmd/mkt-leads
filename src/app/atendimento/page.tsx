@@ -74,6 +74,7 @@ function AtendimentoContent() {
   const [filterChannel, setFilterChannel] = useState<string>('all');
   const [filterUnread, setFilterUnread] = useState<boolean>(false);
   const [filterStatus, setFilterStatus] = useState<string>('active'); // active | archived | all
+  const [filterPeriod, setFilterPeriod] = useState<string>('all'); // all | today | 7d | 30d
 
   // Efeito para capturar busca vinda de outras páginas (como Leads)
   useEffect(() => {
@@ -386,7 +387,30 @@ function AtendimentoContent() {
       (filterStatus === 'active' && chatStatus === 'active') || 
       (filterStatus === 'archived' && chatStatus === 'archived');
 
-    return matchesSearch && matchesChannel && matchesUnread && matchesStatus;
+    // 5. Filtro por Período da Conversa
+    const matchesPeriod = (() => {
+      if (filterPeriod === 'all') return true;
+      const chatDate = new Date(chat.lastTimestamp || chat.dataCriacao || 0);
+      const now = new Date();
+      if (filterPeriod === 'today') {
+        const todayStr = now.toISOString().split('T')[0];
+        const chatDateStr = chatDate.toISOString().split('T')[0];
+        return chatDateStr === todayStr;
+      }
+      if (filterPeriod === '7d') {
+        const limitDate = new Date(now);
+        limitDate.setDate(now.getDate() - 7);
+        return chatDate >= limitDate;
+      }
+      if (filterPeriod === '30d') {
+        const limitDate = new Date(now);
+        limitDate.setDate(now.getDate() - 30);
+        return chatDate >= limitDate;
+      }
+      return true;
+    })();
+
+    return matchesSearch && matchesChannel && matchesUnread && matchesStatus && matchesPeriod;
   });
 
   const activeChat = chats.find(c => c.id === selectedChatId);
@@ -496,11 +520,33 @@ function AtendimentoContent() {
             </select>
           </div>
 
-          <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+            <select 
+              value={filterPeriod}
+              onChange={e => setFilterPeriod(e.target.value)}
+              style={{ 
+                flex: 1, 
+                padding: '0.45rem 0.75rem', 
+                borderRadius: '8px', 
+                border: '1px solid #e2e8f0', 
+                fontSize: '0.8rem', 
+                fontWeight: 600, 
+                color: '#475569',
+                background: '#f8fafc',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="all">Todo o período</option>
+              <option value="today">Hoje</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="30d">Últimos 30 dias</option>
+            </select>
+
             <button
               onClick={() => setFilterUnread(!filterUnread)}
               style={{
-                width: '100%',
+                flex: 1,
                 padding: '0.45rem 0.75rem',
                 borderRadius: '8px',
                 border: '1px solid',
@@ -518,7 +564,7 @@ function AtendimentoContent() {
                 whiteSpace: 'nowrap'
               }}
             >
-              Apenas Não Lidas
+              Não lidas
               {chats.filter(c => (c.unreadCount || 0) > 0).length > 0 && (
                 <span style={{ 
                   background: 'var(--primary)', 
