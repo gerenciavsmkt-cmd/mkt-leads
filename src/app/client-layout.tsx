@@ -85,47 +85,62 @@ export default function ClientLayout({
     return () => unsubscribe();
   }, [pathname, isCapturePage]);
 
+  // --- NOVO: Listener Global para Novos e Re-convertidos Leads ---
   useEffect(() => {
-    const handleNewLead = async (e: any) => {
+    let unsubscribeLeads: any = null;
+
+    const setupLeadsListener = async () => {
       const settings = await api.getSettings();
-      if (!settings.notificacoes?.novosLeads) return;
+      if (settings.notificacoes?.novosLeads === false) return;
 
-      const lead = e.detail;
-      setNotification({
-        type: 'lead',
-        title: '🎉 Novo Lead Capturado!',
-        message: `${lead.nome} acabou de se cadastrar via ${lead.origem}.`,
-        data: lead
-      });
+      const leadsRef = collection(db, 'leads');
+      let isInitialLoad = true;
 
-      // Auto hide after 8 seconds
-      setTimeout(() => setNotification(null), 8000);
-    };
-
-    // Listen for events in the same tab
-    window.addEventListener('crm_new_lead', handleNewLead as any);
-    
-    // Listen for storage changes (other tabs) - Note: With Firebase, we might want to use onSnapshot instead of storage events
-    const handleStorage = async (e: StorageEvent) => {
-      if (e.key === 'crm_leads') {
-        const settings = await api.getSettings();
-        if (settings.notificacoes?.novosLeads) {
-           setNotification({
-             type: 'info',
-             title: 'Base de Leads Atualizada',
-             message: 'Novos dados foram recebidos de outra aba.'
-           });
-           setTimeout(() => setNotification(null), 5000);
+      unsubscribeLeads = onSnapshot(leadsRef, (snapshot) => {
+        if (isInitialLoad) {
+          isInitialLoad = false;
+          return;
         }
-      }
+
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' || change.type === 'modified') {
+            const lead = { id: change.doc.id, ...change.doc.data() } as Lead;
+            const isReconversion = change.type === 'modified';
+
+            setNotification({
+              type: 'lead',
+              title: isReconversion ? '🔄 Lead Re-convertido!' : '🎉 Novo Lead Capturado!',
+              message: isReconversion 
+                ? `${lead.nome} converteu novamente via ${lead.origem}.`
+                : `${lead.nome} acabou de se cadastrar via ${lead.origem}.`,
+              data: lead
+            });
+
+            // Tocar Beep curto de aviso
+            try {
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const oscillator = audioCtx.createOscillator();
+              const gainNode = audioCtx.createGain();
+              oscillator.connect(gainNode);
+              gainNode.connect(audioCtx.destination);
+              oscillator.type = 'sine';
+              oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+              gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+              oscillator.start();
+              setTimeout(() => oscillator.stop(), 200);
+            } catch (e) {}
+
+            // Ocultar automaticamente após 8 segundos
+            setTimeout(() => setNotification(null), 8000);
+          }
+        });
+      });
     };
 
-    window.addEventListener('storage', handleStorage);
+    setupLeadsListener();
 
-    // Cleanup do Event Listener de Leads
     return () => {
-      window.removeEventListener('crm_new_lead', handleNewLead);
-      window.removeEventListener('storage', handleStorage);
+      if (unsubscribeLeads) unsubscribeLeads();
     };
   }, []);
 

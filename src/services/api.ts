@@ -90,7 +90,12 @@ export const api = {
     querySnapshot.forEach((doc) => {
       leads.push({ ...doc.data(), id: doc.id } as Lead);
     });
-    return leads;
+    // Ordenar em memória para garantir que leads com atividade recente (re-conversão) fiquem no topo
+    return leads.sort((a, b) => {
+      const timeA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
+      const timeB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
+      return timeB - timeA;
+    });
   },
   
   saveLead: async (lead: Lead) => {

@@ -109,6 +109,14 @@ export default function LeadsPage() {
     const q = query(collection(db, 'leads'), orderBy('dataCriacao', 'desc'), firestoreLimit(5000));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Lead));
+      
+      // Ordenar em memória pela data da última atividade (re-conversão) ou criação
+      data.sort((a, b) => {
+        const timeA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
+        const timeB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
+        return timeB - timeA;
+      });
+
       setLeads(data);
     });
     return () => unsub();
