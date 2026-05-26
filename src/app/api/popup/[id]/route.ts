@@ -13,7 +13,10 @@ export async function GET(
 
     if (!popup || !popup.isActive) {
       return new NextResponse('// Popup not found or inactive', {
-        headers: { 'Content-Type': 'application/javascript' },
+        headers: { 
+          'Content-Type': 'application/javascript',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        },
       });
     }
 
@@ -213,7 +216,10 @@ export async function GET(
     });
   } catch (error) {
     return new NextResponse('// Error loading popup', {
-      headers: { 'Content-Type': 'application/javascript' },
+      headers: { 
+        'Content-Type': 'application/javascript',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      },
     });
   }
 }
