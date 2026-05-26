@@ -3,9 +3,9 @@ import { api } from '@/services/api';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const allPopups = await api.getPopups();
