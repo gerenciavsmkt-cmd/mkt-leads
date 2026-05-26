@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
-import { Lead, Campaign, FilaEnvio } from '@/types/crm';
+import { Lead, Campaign, FilaEnvio, ChatSession, LandingPageInstance } from '@/types/crm';
 import { useRouter } from 'next/navigation';
 import { getBrevoCreditsAction } from '@/app/actions/brevo';
-import { collection, onSnapshot, query, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit as firestoreLimit, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { 
   Users, 
@@ -25,7 +25,8 @@ import {
   TrendingUp,
   Megaphone,
   CheckCircle2,
-  Calendar
+  Calendar,
+  MessageSquare
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importStatus, setImportStatus] = useState('');
   const [greeting, setGreeting] = useState('Bem-vindo');
+  const [errorMessage, setErrorMessage] = useState('');
   
   interface DashboardStats {
     totalLeads: number;
@@ -41,6 +43,7 @@ export default function Dashboard() {
     enviadosHoje: number;
     pendentes: number;
     limiteRestante: number;
+    conversasPendentes: number;
     leadsByStatus: {
       novo: number;
       contatado: number;
@@ -56,16 +59,213 @@ export default function Dashboard() {
     enviadosHoje: 0,
     pendentes: 0,
     limiteRestante: 0,
+    conversasPendentes: 0,
     leadsByStatus: { novo: 0, contatado: 0, convertido: 0, perdido: 0 }
   });
 
   const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
   const [recentCampaigns, setRecentCampaigns] = useState<Campaign[]>([]);
+  const [totalLeadsCount, setTotalLeadsCount] = useState(0);
+  
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [isChannelsModalOpen, setIsChannelsModalOpen] = useState(false);
+  
+  // Novos estados para o Painel de Landing Pages e Filtros
+  const [landingPages, setLandingPages] = useState<LandingPageInstance[]>([]);
+  const [lpLeads, setLpLeads] = useState<Lead[]>([]);
+  const [panelFilterLp, setPanelFilterLp] = useState('all');
+  const [panelFilterChannel, setPanelFilterChannel] = useState('all');
+  const [panelFilterStatus, setPanelFilterStatus] = useState('all');
+  const [panelPeriod, setPanelPeriod] = useState('all');
+  const [panelCustomStartDate, setPanelCustomStartDate] = useState('');
+  const [panelCustomEndDate, setPanelCustomEndDate] = useState('');
   
   const [period, setPeriod] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [rawData, setRawData] = useState<{ leads: Lead[], campaigns: Campaign[], queue: FilaEnvio[], sentToday: number, realCredits: number, serverTotalLeads?: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Estados locais para armazenar contagens do painel de forma otimizada
+  const [panelCounts, setPanelCounts] = useState({
+    facebook: 0,
+    instagram: 0,
+    whatsapp: 0,
+    whatsapp_widget: 0,
+    youtube: 0,
+    tiktok: 0,
+    system: 0
+  });
+
+  // Carregar e monitorar Chats, LPs e Leads de LPs quando o Painel estiver aberto
+  useEffect(() => {
+    if (!isChannelsModalOpen) return;
+
+    let unsubChats: any;
+    try {
+      const chatsQ = query(collection(db, 'atendimentos_v3'), firestoreLimit(100));
+      unsubChats = onSnapshot(chatsQ, (snap) => {
+        const latestChats = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession));
+        setChats(latestChats);
+      });
+    } catch (err) {
+      console.error("Erro listener chats:", err);
+    }
+
+    const fetchLPData = async () => {
+      try {
+        const lps = await api.getLandingPages();
+        setLandingPages(lps);
+
+        const leadsRef = collection(db, 'leads');
+        const lpSlugs = lps.map(lp => lp.slug).filter(Boolean);
+        
+        // 1. OTIMIZAÇÃO CRÍTICA: Buscar apenas documentos de LPs (geralmente poucos leads) para listar na tabela
+        if (lpSlugs.length > 0) {
+          const lpQuery = query(leadsRef, where('origem', 'in', lpSlugs), firestoreLimit(100));
+          const snap = await getDocs(lpQuery);
+          const filteredLps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead));
+          setLpLeads(filteredLps);
+        }
+
+        // 2. OTIMIZAÇÃO CRÍTICA: Buscar contagens usando getCountFromServer (1000x mais barato)
+        // Isso evita fazer download de milhares de leads e estourar a quota diária
+        const [
+          fbSnap,
+          igSnap,
+          ytSnap,
+          tkSnap,
+          waSnap,
+          widgetSnap,
+          sysSnap
+        ] = await Promise.all([
+          getCountFromServer(query(leadsRef, where('origem', '==', 'Facebook Messenger'))),
+          getCountFromServer(query(leadsRef, where('origem', '==', 'Instagram Direct'))),
+          getCountFromServer(query(leadsRef, where('origem', '==', 'YouTube Comments'))),
+          getCountFromServer(query(leadsRef, where('origem', '==', 'TikTok Comments'))),
+          // WhatsApp Atendimento: Origens normais de WhatsApp
+          getCountFromServer(query(leadsRef, where('origem', '>=', 'WhatsApp'), where('origem', '<=', 'WhatsApp\uf8ff'))),
+          // WhatsApp Widget: Origens contendo Widget/Botão
+          getCountFromServer(query(leadsRef, where('origem', '>=', 'Widget Externo'), where('origem', '<=', 'Widget Externo\uf8ff'))),
+          lpSlugs.length > 0 
+            ? getCountFromServer(query(leadsRef, where('origem', 'in', lpSlugs)))
+            : { data: () => ({ count: 0 }) }
+        ]);
+
+        setPanelCounts({
+          facebook: fbSnap.data().count,
+          instagram: igSnap.data().count,
+          youtube: ytSnap.data().count,
+          tiktok: tkSnap.data().count,
+          whatsapp: waSnap.data().count,
+          whatsapp_widget: widgetSnap.data().count,
+          system: sysSnap.data().count
+        });
+      } catch (err: any) {
+        console.error("Erro ao buscar dados de landing pages:", err);
+        setErrorMessage("Erro de Quota ou Firestore: " + (err.message || String(err)));
+      }
+    };
+
+    fetchLPData();
+
+    return () => {
+      if (unsubChats) unsubChats();
+    };
+  }, [isChannelsModalOpen]);
+
+  // Carregar estatísticas com suporte a Cache (TTL de 2 minutos)
+  const fetchAll = async (forceRefresh = false) => {
+    setIsLoading(true);
+    const cacheKey = `dashboard_cached_data_${period}_${customStartDate}_${customEndDate}`;
+    
+    if (typeof window !== 'undefined' && !forceRefresh) {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { timestamp, stats: cachedStats, recentLeads: cachedLeads, recentCampaigns: cachedCamps } = JSON.parse(cached);
+          if (Date.now() - timestamp < 2 * 60 * 1000) { // 2 minutos de TTL
+            setStats(cachedStats);
+            setRecentLeads(cachedLeads);
+            setRecentCampaigns(cachedCamps);
+            setTotalLeadsCount(cachedStats.totalLeads);
+            setIsLoading(false);
+            
+            if (cachedStats.totalLeads === 0) {
+              fetchAll(true);
+            }
+            return;
+          }
+        } catch (e) {
+          console.error("Erro ao ler cache do dashboard:", e);
+        }
+      }
+    }
+
+    let initialStats = { 
+      totalLeads: 0, 
+      totalCampaigns: 0, 
+      pendentes: 0, 
+      leadsHoje: 0, 
+      conversasPendentes: 0,
+      leadsByStatus: { novo: 0, contatado: 0, convertido: 0, perdido: 0 },
+      recentLeads: [] as Lead[], 
+      recentCampaigns: [] as Campaign[] 
+    };
+    let sentToday = 0;
+    let realCredits = 0;
+
+    try {
+      initialStats = await api.getDashboardStats(period, customStartDate, customEndDate);
+    } catch (err: any) {
+      console.error("Erro ao buscar stats iniciais:", err);
+      setErrorMessage(err?.message || String(err));
+    }
+
+    try {
+      sentToday = await api.getSentTodayCount();
+    } catch (err) {
+      console.error("Erro ao buscar envios de hoje:", err);
+    }
+
+    try {
+      const settings = await api.getSettings();
+      realCredits = await getBrevoCreditsAction(settings.brevoApiKey);
+    } catch (err) {
+      console.error("Erro ao buscar créditos brevo:", err);
+    }
+
+    const calculatedStats = {
+      totalLeads: initialStats.totalLeads,
+      totalCampaigns: initialStats.totalCampaigns,
+      pendentes: initialStats.pendentes,
+      leadsHoje: initialStats.leadsHoje,
+      enviadosHoje: sentToday,
+      limiteRestante: realCredits,
+      conversasPendentes: initialStats.conversasPendentes,
+      leadsByStatus: initialStats.leadsByStatus
+    };
+
+    setStats(calculatedStats);
+    setRecentLeads(initialStats.recentLeads);
+    setRecentCampaigns(initialStats.recentCampaigns);
+    setTotalLeadsCount(initialStats.totalLeads);
+
+    // Gravar no cache local
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          timestamp: Date.now(),
+          stats: calculatedStats,
+          recentLeads: initialStats.recentLeads,
+          recentCampaigns: initialStats.recentCampaigns
+        }));
+      } catch (e) {
+        console.error("Erro ao salvar cache:", e);
+      }
+    }
+    
+    setIsLoading(false);
+  };
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -73,155 +273,90 @@ export default function Dashboard() {
     else if (hour < 18) setGreeting('Boa tarde');
     else setGreeting('Boa noite');
 
+    fetchAll();
+
+    // Listeners extremamente leves em tempo real apenas para o feed de feeds recentes (limite 5 e 4)
+    // para manter o feed responsivo sem gastar cota do banco de dados
     let unsubLeads: any;
     let unsubCampaigns: any;
-    let unsubQueue: any;
 
-    const fetchAll = async () => {
-      // Initialize default empty state to ensure rawData is always defined
-      let initialStats = { totalLeads: 0, totalCampaigns: 0, pendentes: 0, leadsHoje: 0, recentLeads: [] as Lead[], recentCampaigns: [] as Campaign[] };
-      let sentToday = 0;
-      let realCredits = 0;
+    try {
+      const leadsQ = query(collection(db, 'leads'), firestoreLimit(100));
+      unsubLeads = onSnapshot(leadsQ, (snap) => {
+        const latestLeads = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Lead))
+          .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
+          .slice(0, 5);
+        setRecentLeads(latestLeads);
+      });
+    } catch (err) { console.error("Erro listener leads:", err); }
 
-      try {
-        initialStats = await api.getDashboardStats();
-      } catch (err) {
-        console.error("Erro ao buscar stats iniciais:", err);
-      }
-
-      try {
-        sentToday = await api.getSentTodayCount();
-      } catch (err) {
-        console.error("Erro ao buscar envios de hoje:", err);
-      }
-
-      try {
-        const settings = await api.getSettings();
-        realCredits = await getBrevoCreditsAction(settings.brevoApiKey);
-      } catch (err) {
-        console.error("Erro ao buscar créditos brevo:", err);
-      }
-
-      setStats(prev => ({
-        ...prev,
-        totalLeads: initialStats.totalLeads,
-        totalCampaigns: initialStats.totalCampaigns,
-        pendentes: initialStats.pendentes,
-        leadsHoje: initialStats.leadsHoje,
-        enviadosHoje: sentToday,
-        limiteRestante: realCredits
-      }));
-
-      setRecentLeads(initialStats.recentLeads);
-      setRecentCampaigns(initialStats.recentCampaigns);
-      setRawData({ leads: initialStats.recentLeads, campaigns: initialStats.recentCampaigns, queue: [], sentToday, realCredits, serverTotalLeads: initialStats.totalLeads });
-
-      // Setup Real-time Listeners (onSnapshot) to keep dashboard dynamically updated
-      try {
-        const leadsQ = query(collection(db, 'leads'), orderBy('dataCriacao', 'desc'), firestoreLimit(1000));
-        unsubLeads = onSnapshot(leadsQ, (snap) => {
-          const latestLeads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead));
-          setRawData(prev => prev ? { ...prev, leads: latestLeads } : { leads: latestLeads, campaigns: [], queue: [], sentToday: 0, realCredits: 0 });
-        });
-      } catch (err) { console.error("Erro listener leads:", err); }
-
-      try {
-        const campQ = query(collection(db, 'campaigns'), orderBy('dataCriacao', 'desc'), firestoreLimit(100));
-        unsubCampaigns = onSnapshot(campQ, (snap) => {
-          const latestCamps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign));
-          setRawData(prev => prev ? { ...prev, campaigns: latestCamps } : null);
-        });
-      } catch (err) { console.error("Erro listener campanhas:", err); }
-
-      try {
-        const queueQ = query(collection(db, 'queue'), orderBy('dataEnvio', 'desc'), firestoreLimit(200));
-        unsubQueue = onSnapshot(queueQ, (snap) => {
-          const latestQueue = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FilaEnvio));
-          setRawData(prev => prev ? { ...prev, queue: latestQueue } : null);
-        });
-      } catch (err) { console.error("Erro listener queue:", err); }
-    };
-
-    fetchAll();
+    try {
+      const campQ = query(collection(db, 'campaigns'), firestoreLimit(100));
+      unsubCampaigns = onSnapshot(campQ, (snap) => {
+        const latestCamps = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Campaign))
+          .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
+          .slice(0, 4);
+        setRecentCampaigns(latestCamps);
+      });
+    } catch (err) { console.error("Erro listener campanhas:", err); }
 
     return () => {
       if (unsubLeads) unsubLeads();
       if (unsubCampaigns) unsubCampaigns();
-      if (unsubQueue) unsubQueue();
     };
-  }, []);
+  }, [period, customStartDate, customEndDate]);
 
-  useEffect(() => {
-    if (!rawData) return;
+  // --- CÁLCULO DE ESTATÍSTICAS DOS CANAIS DE ENTRADA (MODAL) ---
+  const channelsStats = (() => {
+    const activeChatsCount = chats.length;
+    const chatsUnreadCount = chats.filter(c => (c.unreadCount || 0) > 0).length;
 
-    const { leads, campaigns, queue, sentToday, realCredits, serverTotalLeads } = rawData;
-    const now = new Date();
-    let limitDate = new Date(0);
-    let endDate = new Date(now);
-    // Para períodos pré-definidos, o endDate é sempre o momento atual
+    const channelChatCounts = {
+      whatsapp: chats.filter(c => c.channel === 'whatsapp').length,
+      instagram: chats.filter(c => c.channel === 'instagram').length,
+      facebook: chats.filter(c => c.channel === 'facebook').length,
+      youtube: chats.filter(c => c.channel === 'youtube').length,
+      tiktok: chats.filter(c => c.channel === 'tiktok').length,
+      system: chats.filter(c => c.channel === 'system').length,
+    };
+
+    const sourceCounts: Record<string, number> = {};
+    let totalLeadsWithSource = 0;
     
-    if (period === 'today') {
-      limitDate = new Date();
-      limitDate.setHours(0,0,0,0);
-    } else if (period === '7d') {
-      limitDate = new Date(now);
-      limitDate.setDate(now.getDate() - 7);
-    } else if (period === '30d') {
-      limitDate = new Date(now);
-      limitDate.setDate(now.getDate() - 30);
-    } else if (period === 'month') {
-      limitDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (period === 'custom') {
-      if (customStartDate) {
-        limitDate = new Date(customStartDate + 'T00:00:00');
-      }
-      if (customEndDate) {
-        endDate = new Date(customEndDate + 'T23:59:59');
-      }
+    const currentLeadsList = recentLeads || [];
+    currentLeadsList.forEach((l: Lead) => {
+      const source = l.origem || 'Outros';
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+      totalLeadsWithSource++;
+    });
+
+    const sortedSources = Object.entries(sourceCounts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percent: totalLeadsWithSource > 0 ? (count / totalLeadsWithSource) : 0
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+
+    while (sortedSources.length < 4) {
+      sortedSources.push({
+        name: sortedSources.length === 0 ? 'Sem dados' : 'Outros',
+        count: 0,
+        percent: 0
+      });
     }
 
-    // Ordenar leads por atividade mais recente em memória para o painel
-    const sortedLeads = [...leads].sort((a, b) => {
-      const timeA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
-      const timeB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
-      return timeB - timeA;
-    });
-
-    const filteredLeads = sortedLeads.filter(l => {
-      const d = new Date(l.dataUltimaAtividade || l.dataCriacao);
-      return d >= limitDate && d <= endDate;
-    });
-    const filteredCampaigns = campaigns.filter(c => {
-      const d = new Date(c.dataCriacao);
-      return d >= limitDate && d <= endDate;
-    });
-
-    const todayString = now.toISOString().split('T')[0];
-    const leadsHoje = leads.filter(l => {
-      const convDate = l.dataUltimaConversao || l.dataUltimaAtividade || l.dataCriacao;
-      return convDate.startsWith(todayString);
-    }).length;
-
-    const leadsByStatus = {
-      novo: filteredLeads.filter(l => l.status === 'novo').length,
-      contatado: filteredLeads.filter(l => l.status === 'contatado').length,
-      convertido: filteredLeads.filter(l => l.status === 'convertido').length,
-      perdido: filteredLeads.filter(l => l.status === 'perdido').length,
+    return {
+      activeChatsCount,
+      chatsUnreadCount,
+      channelChatCounts,
+      sortedSources,
+      totalLeadsWithSource
     };
-
-    setStats({
-      totalLeads: period === 'all' && serverTotalLeads ? Math.max(filteredLeads.length, serverTotalLeads) : filteredLeads.length,
-      leadsHoje: leadsHoje, // leadsHoje is absolute for today regardless of filter
-      totalCampaigns: filteredCampaigns.length,
-      enviadosHoje: sentToday,
-      pendentes: queue.filter(q => q.status === 'pendente' || (q.status === 'erro' && q.tentativa < 3)).length,
-      limiteRestante: realCredits,
-      leadsByStatus
-    });
-
-    setRecentLeads(sortedLeads.slice(0, 5));
-    setRecentCampaigns(filteredCampaigns.slice(0, 4));
-  }, [rawData, period, customStartDate, customEndDate]);
+  })();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -244,6 +379,11 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-wrapper">
+      {errorMessage && (
+        <div style={{ background: '#fef2f2', border: '1px solid #f87171', color: '#991b1b', padding: '1rem', borderRadius: '12px', marginBottom: '2.5rem', fontWeight: 600 }}>
+          Erro ao carregar dados do Firebase: {errorMessage}
+        </div>
+      )}
       <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.025em' }}>{greeting}, Administrador 👋</h2>
@@ -299,13 +439,13 @@ export default function Dashboard() {
       </header>
 
       {/* STATS CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.25rem', marginBottom: '2.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1.25rem', marginBottom: '2.5rem' }}>
         <StatCard 
-          icon={<Users size={24} />} 
-          title="Total de Leads" 
-          value={stats.totalLeads} 
-          color="var(--primary)" 
-          bgColor="rgba(99, 102, 241, 0.1)" 
+          icon={<MessageSquare size={24} />} 
+          title="Conversas Pendentes" 
+          value={stats.conversasPendentes} 
+          color="#ef4444" 
+          bgColor="rgba(239, 68, 68, 0.1)" 
         />
         <StatCard 
           icon={<Zap size={24} />} 
@@ -336,6 +476,16 @@ export default function Dashboard() {
           color="#ec4899" 
           bgColor="rgba(236, 72, 153, 0.1)" 
         />
+        <div onClick={() => setIsChannelsModalOpen(true)} style={{ cursor: 'pointer' }}>
+          <StatCard 
+            icon={<Megaphone size={24} />} 
+            title="Canais de Entrada" 
+            value="Ver Painel" 
+            color="#06b6d4" 
+            bgColor="rgba(6, 182, 212, 0.1)" 
+            highlight
+          />
+        </div>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -516,10 +666,431 @@ export default function Dashboard() {
         </div>
       )}
 
+      {isChannelsModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0b0f19', color: '#f8fafc', zIndex: 1000, padding: '2.5rem', display: 'flex', flexDirection: 'column', overflowY: 'auto', fontFamily: "'Inter', sans-serif" }}>
+          {/* Header Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid #1e293b', paddingBottom: '1.5rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, letterSpacing: '-0.025em', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc' }}>
+                <Megaphone size={22} style={{ color: '#06b6d4' }} />
+                Painel de Canais & LPs
+              </h3>
+              <p style={{ opacity: 0.5, fontSize: '0.8125rem', marginTop: '0.25rem' }}>Estatísticas em tempo real, leads de landing pages e fontes de tráfego.</p>
+            </div>
+
+            {/* Filters and Close */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {/* LP Filter */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Página de Captura</span>
+                  <select 
+                    value={panelFilterLp}
+                    onChange={e => setPanelFilterLp(e.target.value)}
+                    style={{ background: '#111827', color: '#f8fafc', border: '1px solid #1e293b', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todas as LPs</option>
+                    {landingPages.map(lp => (
+                      <option key={lp.id} value={lp.slug}>{lp.config?.titulo || lp.slug} (/{lp.slug})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Channel Filter */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Canal de Tráfego</span>
+                  <select 
+                    value={panelFilterChannel}
+                    onChange={e => setPanelFilterChannel(e.target.value)}
+                    style={{ background: '#111827', color: '#f8fafc', border: '1px solid #1e293b', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todos os Canais</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="facebook">Messenger/Facebook</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="tiktok">Tiktok</option>
+                    <option value="system">Sistema/Site</option>
+                  </select>
+                </div>
+
+                {/* Lead Status Filter */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Status do Lead</span>
+                  <select 
+                    value={panelFilterStatus}
+                    onChange={e => setPanelFilterStatus(e.target.value)}
+                    style={{ background: '#111827', color: '#f8fafc', border: '1px solid #1e293b', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todos os Status</option>
+                    <option value="novo">Novo</option>
+                    <option value="contatado">Contatado</option>
+                    <option value="convertido">Convertido</option>
+                    <option value="perdido">Perdido</option>
+                  </select>
+                </div>
+
+                {/* Period Filter */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Período</span>
+                  <select 
+                    value={panelPeriod}
+                    onChange={e => setPanelPeriod(e.target.value)}
+                    style={{ background: '#111827', color: '#f8fafc', border: '1px solid #1e293b', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.8125rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todo o período</option>
+                    <option value="today">Hoje</option>
+                    <option value="7d">Últimos 7 dias</option>
+                    <option value="30d">Últimos 30 dias</option>
+                    <option value="month">Este Mês</option>
+                    <option value="custom">Personalizado</option>
+                  </select>
+                </div>
+
+                {panelPeriod === 'custom' && (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: '#111827', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid #1e293b', alignSelf: 'flex-end', height: '35px' }}>
+                    <input 
+                      type="date" 
+                      value={panelCustomStartDate} 
+                      onChange={e => setPanelCustomStartDate(e.target.value)}
+                      style={{ padding: '0.25rem', border: 'none', background: 'transparent', fontSize: '0.8125rem', fontWeight: 600, color: '#f8fafc', outline: 'none', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 600 }}>até</span>
+                    <input 
+                      type="date" 
+                      value={panelCustomEndDate} 
+                      onChange={e => setPanelCustomEndDate(e.target.value)}
+                      style={{ padding: '0.25rem', border: 'none', background: 'transparent', fontSize: '0.8125rem', fontWeight: 600, color: '#f8fafc', outline: 'none', cursor: 'pointer' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <button 
+                style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '12px', padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600, transition: 'background 0.2s', alignSelf: 'flex-end', height: '38px', marginTop: 'auto' }}
+                onClick={() => setIsChannelsModalOpen(false)}
+                onMouseOver={e => e.currentTarget.style.background = '#dc2626'}
+                onMouseOut={e => e.currentTarget.style.background = '#ef4444'}
+              >
+                <X size={18} /> Fechar Painel
+              </button>
+            </div>
+          </div>
+
+          {/* Filtering Logic applied to counts */}
+          {(() => {
+            const filteredChats = chats.filter(c => {
+              if (panelFilterChannel !== 'all' && c.channel !== panelFilterChannel) return false;
+              
+              if (panelPeriod !== 'all') {
+                const timestamp = c.lastTimestamp || c.dataCriacao;
+                if (!timestamp) return true;
+                const d = new Date(timestamp);
+                const now = new Date();
+                let limitDate = new Date(0);
+                let endDate = new Date(now);
+                
+                if (panelPeriod === 'today') {
+                  limitDate = new Date();
+                  limitDate.setHours(0,0,0,0);
+                } else if (panelPeriod === '7d') {
+                  limitDate = new Date(now);
+                  limitDate.setDate(now.getDate() - 7);
+                } else if (panelPeriod === '30d') {
+                  limitDate = new Date(now);
+                  limitDate.setDate(now.getDate() - 30);
+                } else if (panelPeriod === 'month') {
+                  limitDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                } else if (panelPeriod === 'custom') {
+                  if (panelCustomStartDate) limitDate = new Date(panelCustomStartDate + 'T00:00:00');
+                  if (panelCustomEndDate) endDate = new Date(panelCustomEndDate + 'T23:59:59');
+                }
+                
+                if (d < limitDate || d > endDate) return false;
+              }
+              return true;
+            });
+
+            const filteredLpLeads = lpLeads.filter(l => {
+              if (panelFilterLp !== 'all' && l.origem !== panelFilterLp) return false;
+              if (panelFilterStatus !== 'all' && l.status !== panelFilterStatus) return false;
+              
+              if (panelPeriod !== 'all') {
+                const d = new Date(l.dataCriacao);
+                const now = new Date();
+                let limitDate = new Date(0);
+                let endDate = new Date(now);
+                
+                if (panelPeriod === 'today') {
+                  limitDate = new Date();
+                  limitDate.setHours(0,0,0,0);
+                } else if (panelPeriod === '7d') {
+                  limitDate = new Date(now);
+                  limitDate.setDate(now.getDate() - 7);
+                } else if (panelPeriod === '30d') {
+                  limitDate = new Date(now);
+                  limitDate.setDate(now.getDate() - 30);
+                } else if (panelPeriod === 'month') {
+                  limitDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                } else if (panelPeriod === 'custom') {
+                  if (panelCustomStartDate) limitDate = new Date(panelCustomStartDate + 'T00:00:00');
+                  if (panelCustomEndDate) endDate = new Date(panelCustomEndDate + 'T23:59:59');
+                }
+                
+                if (d < limitDate || d > endDate) return false;
+              }
+              return true;
+            });
+
+            const unreadCount = filteredChats.filter(c => (c.unreadCount || 0) > 0).length;
+
+            const channelLeadCounts = {
+              facebook: panelCounts.facebook,
+              instagram: panelCounts.instagram,
+              whatsapp: panelCounts.whatsapp,
+              whatsapp_widget: panelCounts.whatsapp_widget,
+              youtube: panelCounts.youtube,
+              tiktok: panelCounts.tiktok,
+              system: panelCounts.system
+            };
+
+            const totalLeadsCalculated = channelLeadCounts.facebook + channelLeadCounts.instagram + channelLeadCounts.whatsapp + channelLeadCounts.whatsapp_widget + channelLeadCounts.youtube + channelLeadCounts.tiktok + channelLeadCounts.system;
+
+            // Fontes de Leads a partir de todos os leads de LP carregados
+            const sourceCounts: Record<string, number> = {};
+            let totalLeadsWithSource = 0;
+            filteredLpLeads.forEach(l => {
+              const source = l.origem || 'Outros';
+              sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+              totalLeadsWithSource++;
+            });
+
+            const sortedSources = Object.entries(sourceCounts)
+              .map(([name, count]) => ({
+                name,
+                count,
+                percent: totalLeadsWithSource > 0 ? (count / totalLeadsWithSource) : 0
+              }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 4);
+
+            while (sortedSources.length < 4) {
+              sortedSources.push({
+                name: sortedSources.length === 0 ? 'Sem dados' : 'Outras LPs',
+                count: 0,
+                percent: 0
+              });
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1 }}>
+                {/* Stats cards and radial rings grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '2rem' }}>
+                  
+                  {/* Col 1: Mensagens Recebidas / Canais */}
+                  <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                      <div>
+                        <h5 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af' }}>Leads por Canal / Origem</h5>
+                        <p style={{ fontSize: '0.625rem', color: '#6b7280', marginTop: '0.25rem' }}>Canal: {panelFilterChannel === 'all' ? 'Todos' : panelFilterChannel.toUpperCase()}</p>
+                      </div>
+                      <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#10b981', lineHeight: '1' }}>{totalLeadsCalculated}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+                      {[
+                        { label: 'Messenger', count: channelLeadCounts.facebook, color: '#3b82f6', icon: '💬', code: 'facebook' },
+                        { label: 'Instagram', count: channelLeadCounts.instagram, color: '#ec4899', icon: '📸', code: 'instagram' },
+                        { label: 'WhatsApp (Atendimento)', count: channelLeadCounts.whatsapp, color: '#10b981', icon: '🟢', code: 'whatsapp' },
+                        { label: 'Botão WhatsApp (Site)', count: channelLeadCounts.whatsapp_widget, color: '#25d366', icon: '📲', code: 'whatsapp_widget' },
+                        { label: 'YouTube / Comentários', count: channelLeadCounts.youtube, color: '#ef4444', icon: '🔴', code: 'youtube' },
+                        { label: 'Tiktok', count: channelLeadCounts.tiktok, color: '#f43f5e', icon: '🎵', code: 'tiktok' },
+                        { label: 'Sistema / Captura', count: channelLeadCounts.system, color: '#6366f1', icon: '🌐', code: 'system' }
+                      ].map((ch, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => router.push(`/leads?canal=${ch.code}`)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            padding: '0.5rem', 
+                            margin: '0 -0.5rem',
+                            borderRadius: '8px',
+                            borderBottom: '1px solid #1f2937', 
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          className="channel-item-hover"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1rem' }}>{ch.icon}</span>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#e5e7eb' }}>{ch.label}</span>
+                          </div>
+                          <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: ch.color }}>{ch.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Col 2: Conversas / Métricas Rápidas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <h5 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '0.5rem' }}>Conversas Ativas</h5>
+                      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#38bdf8', lineHeight: '1' }}>{filteredChats.length}</p>
+                    </div>
+
+                    <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <h5 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#ef4444', marginBottom: '0.5rem' }}>Mensagens não lidas</h5>
+                      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#ef4444', lineHeight: '1' }}>{unreadCount}</p>
+                    </div>
+
+                    <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <h5 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '0.25rem' }}>Leads Filtrados de LPs</h5>
+                      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#10b981', lineHeight: '1' }}>{filteredLpLeads.length}</p>
+                    </div>
+
+                    <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <h5 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '0.25rem' }}>LPs Ativas</h5>
+                      <p style={{ fontSize: '2.25rem', fontWeight: 800, color: '#c084fc', lineHeight: '1' }}>{landingPages.length}</p>
+                    </div>
+                  </div>
+
+                  {/* Col 3: Fontes de Lead (Radial Rings) */}
+                  <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                    <h5 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '1rem' }}>Desempenho das Páginas de Captura</h5>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', flex: 1 }}>
+                      {/* SVG Concentric Rings */}
+                      <div style={{ position: 'relative', width: '160px', height: '160px' }}>
+                        <svg width="160" height="160" viewBox="0 0 220 220" style={{ transform: 'rotate(-90deg)' }}>
+                          {[
+                            { radius: 90, color: '#c084fc', data: sortedSources[0] },
+                            { radius: 75, color: '#4ade80', data: sortedSources[1] },
+                            { radius: 60, color: '#38bdf8', data: sortedSources[2] },
+                            { radius: 45, color: '#fbbf24', data: sortedSources[3] }
+                          ].map((ring, idx) => {
+                            const circumference = 2 * Math.PI * ring.radius;
+                            const strokeDashoffset = circumference - (ring.data ? ring.data.percent : 0) * circumference;
+                            return (
+                              <g key={idx}>
+                                <circle
+                                  cx="110"
+                                  cy="110"
+                                  r={ring.radius}
+                                  fill="none"
+                                  stroke="#1f2937"
+                                  strokeWidth="10"
+                                />
+                                <circle
+                                  cx="110"
+                                  cy="110"
+                                  r={ring.radius}
+                                  fill="none"
+                                  stroke={ring.color}
+                                  strokeWidth="10"
+                                  strokeDasharray={circumference}
+                                  strokeDashoffset={strokeDashoffset}
+                                  strokeLinecap="round"
+                                  style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+                                />
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+
+                      {/* Labels / Legend */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+                        {[
+                          { color: '#c084fc', data: sortedSources[0] },
+                          { color: '#4ade80', data: sortedSources[1] },
+                          { color: '#38bdf8', data: sortedSources[2] },
+                          { color: '#fbbf24', data: sortedSources[3] }
+                        ].map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                            <div style={{ overflow: 'hidden', width: '100%' }}>
+                              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {item.data?.name || 'Sem dados'}
+                              </p>
+                              <p style={{ fontSize: '0.6875rem', color: '#9ca3af' }}>
+                                {item.data?.count || 0} leads ({item.data ? Math.round(item.data.percent * 100) : 0}%)
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Leads captured by Landing Pages */}
+                <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc' }}>
+                        Leads de Páginas de Captura ({filteredLpLeads.length})
+                      </h4>
+                      <p style={{ fontSize: '0.8125rem', color: '#9ca3af', marginTop: '0.25rem' }}>Filtro atual: {panelFilterLp === 'all' ? 'Todas as LPs' : `/${panelFilterLp}`} | Status: {panelFilterStatus === 'all' ? 'Todos' : panelFilterStatus.toUpperCase()}</p>
+                    </div>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    {filteredLpLeads.length === 0 ? (
+                      <p style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af', fontSize: '0.9375rem' }}>Nenhum lead encontrado com os filtros selecionados.</p>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e5e7eb' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #1f2937', textAlign: 'left' }}>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Nome</th>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>E-mail</th>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>WhatsApp/Celular</th>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Página de Origem</th>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Status</th>
+                            <th style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Data Cadastro</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredLpLeads.map((lead) => (
+                            <tr key={lead.id} style={{ borderBottom: '1px solid #1f2937', fontSize: '0.875rem' }} onMouseOver={e => e.currentTarget.style.background = '#1f2937'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                              <td style={{ padding: '1rem', fontWeight: 600, color: '#f3f4f6' }}>{lead.nome}</td>
+                              <td style={{ padding: '1rem', color: '#9ca3af' }}>{lead.email}</td>
+                              <td style={{ padding: '1rem' }}>{lead.celular || lead.telefone || '-'}</td>
+                              <td style={{ padding: '1rem', color: '#38bdf8', fontWeight: 500 }}>
+                                <span style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '6px' }}>
+                                  /{lead.origem}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1rem' }}>
+                                <span className={`badge badge-${lead.status}`} style={{ textTransform: 'uppercase', fontSize: '0.6875rem', fontWeight: 700 }}>
+                                  {lead.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1rem', color: '#9ca3af' }}>
+                                {new Date(lead.dataCriacao).toLocaleDateString('pt-BR')} {new Date(lead.dataCriacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       <style jsx>{`
         .hover-lift:hover {
           transform: translateY(-4px);
           box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
+        }
+        .channel-item-hover:hover {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          transform: translateX(4px);
         }
       `}</style>
     </div>
@@ -534,7 +1105,7 @@ function StatCard({ icon, title, value, color, bgColor, highlight = false }: any
       </div>
       <div>
         <p style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 600, marginBottom: '0.25rem' }}>{title}</p>
-        <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e293b', lineHeight: 1 }}>{value}</h3>
+        <h3 style={{ fontSize: value === 'Ver Painel' ? '1.25rem' : '1.75rem', fontWeight: 800, color: '#1e293b', lineHeight: 1, whiteSpace: 'nowrap' }}>{value}</h3>
       </div>
     </div>
   );

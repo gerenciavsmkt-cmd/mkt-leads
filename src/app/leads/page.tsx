@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
-import { Lead, LeadStatus, Segmentation } from '@/types/crm';
+import { Lead, LeadStatus, Segmentation, LandingPageInstance } from '@/types/crm';
 import { collection, onSnapshot, query, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { 
@@ -31,8 +32,10 @@ const WhatsAppIcon = ({ size = 18, color = 'currentColor' }) => (
   </svg>
 );
 
-export default function LeadsPage() {
+function LeadsContent() {
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [landingPages, setLandingPages] = useState<LandingPageInstance[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   
@@ -41,8 +44,35 @@ export default function LeadsPage() {
   const [filters, setFilters] = useState({
     status: '',
     origem: '',
-    estado: ''
+    estado: '',
+    canal: ''
   });
+
+  useEffect(() => {
+    const fetchLPs = async () => {
+      try {
+        const lps = await api.getLandingPages();
+        setLandingPages(lps);
+      } catch (err) {
+        console.error("Erro LPs leads:", err);
+      }
+    };
+    fetchLPs();
+  }, []);
+
+  useEffect(() => {
+    const canal = searchParams.get('canal');
+    const status = searchParams.get('status');
+    const origem = searchParams.get('origem');
+    if (canal || status || origem) {
+      setFilters(prev => ({
+        ...prev,
+        canal: canal || '',
+        status: status || '',
+        origem: origem || ''
+      }));
+    }
+  }, [searchParams]);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -417,7 +447,31 @@ export default function LeadsPage() {
     const matchesOrigem = !filters.origem || lead.origem === filters.origem;
     const matchesEstado = !filters.estado || lead.estado === filters.estado;
 
-    return matchesSearch && matchesStatus && matchesOrigem && matchesEstado;
+    // Filtro por canal de entrada
+    let matchesCanal = true;
+    if (filters.canal) {
+      const orig = (lead.origem || '').toLowerCase();
+      const tags = (lead.tags || []).map(t => t.toLowerCase());
+      
+      if (filters.canal === 'whatsapp') {
+        matchesCanal = (orig.includes('whatsapp') && !orig.includes('widget')) || (tags.includes('whatsapp') && !tags.includes('widget'));
+      } else if (filters.canal === 'whatsapp_widget') {
+        matchesCanal = orig.includes('widget') || tags.includes('widget');
+      } else if (filters.canal === 'instagram') {
+        matchesCanal = orig.includes('instagram') || tags.includes('instagram');
+      } else if (filters.canal === 'facebook') {
+        matchesCanal = orig.includes('facebook') || orig.includes('messenger') || tags.includes('facebook') || tags.includes('messenger');
+      } else if (filters.canal === 'youtube') {
+        matchesCanal = orig.includes('youtube');
+      } else if (filters.canal === 'tiktok') {
+        matchesCanal = orig.includes('tiktok');
+      } else if (filters.canal === 'system') {
+        const lpSlugs = landingPages.map(lp => lp.slug).filter(Boolean);
+        matchesCanal = lpSlugs.includes(lead.origem);
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesOrigem && matchesEstado && matchesCanal;
   });
 
   // Pagination Logic
@@ -535,13 +589,35 @@ export default function LeadsPage() {
                     <h4 style={{ fontWeight: 600 }}>Filtros Avançados</h4>
                     <button 
                       style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 500 }}
-                      onClick={() => setFilters({ status: '', origem: '', estado: '' })}
+                      onClick={() => {
+                        setFilters({ status: '', origem: '', estado: '', canal: '' });
+                        setIsFilterMenuOpen(false);
+                      }}
                     >
                       Limpar
                     </button>
                   </div>
 
                   <div style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', opacity: 0.6 }}>Canal de Entrada</label>
+                      <select 
+                        className="btn-outline" 
+                        style={{ width: '100%', height: '36px', padding: '0 0.5rem', fontSize: '0.875rem' }}
+                        value={filters.canal}
+                        onChange={(e) => setFilters({ ...filters, canal: e.target.value })}
+                      >
+                        <option value="">Todos</option>
+                        <option value="whatsapp">WhatsApp (Atendimento)</option>
+                        <option value="whatsapp_widget">Botão WhatsApp (Site)</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Messenger / Facebook</option>
+                        <option value="youtube">YouTube / Comentários</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="system">Sistema / Captura (LPs)</option>
+                      </select>
+                    </div>
+
                     <div>
                       <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', opacity: 0.6 }}>Status</label>
                       <select 
@@ -1115,5 +1191,13 @@ export default function LeadsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <LeadsContent />
+    </Suspense>
   );
 }

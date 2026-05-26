@@ -730,40 +730,137 @@ export const api = {
   },
 
   // Optimized Dashboard Stats
-  getDashboardStats: async () => {
+  getDashboardStats: async (period?: string, customStart?: string, customEnd?: string) => {
     const leadsRef = collection(db, COLLECTIONS.LEADS);
     const campaignsRef = collection(db, COLLECTIONS.CAMPAIGNS);
     const queueRef = collection(db, COLLECTIONS.QUEUE);
+    const chatsRef = collection(db, COLLECTIONS.CHATS);
 
+    // Calcular datas para filtro
     const now = new Date();
+    let limitDateStr = '';
+    let endDateStr = '';
+
+    if (period === 'today') {
+      const d = new Date();
+      d.setHours(0,0,0,0);
+      limitDateStr = d.toISOString();
+    } else if (period === '7d') {
+      const d = new Date();
+      d.setDate(now.getDate() - 7);
+      limitDateStr = d.toISOString();
+    } else if (period === '30d') {
+      const d = new Date();
+      d.setDate(now.getDate() - 30);
+      limitDateStr = d.toISOString();
+    } else if (period === 'month') {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      limitDateStr = d.toISOString();
+    } else if (period === 'custom') {
+      if (customStart) limitDateStr = new Date(customStart + 'T00:00:00').toISOString();
+      if (customEnd) endDateStr = new Date(customEnd + 'T23:59:59').toISOString();
+    }
+
     const todayStr = now.toISOString().split('T')[0];
 
+    // Para evitar a necessidade de índices compostos (que causam erro no Firebase se não forem criados manualmente),
+    // se houver filtro de período, nós buscamos os leads do período em si e agrupamos em memória.
+    // Se for "Todo o período" (sem filtros de data), usamos getCountFromServer que é extremamente rápido e não exige índices.
+    
+    let totalLeadsCount = 0;
+    let leadsByStatus = { novo: 0, contatado: 0, convertido: 0, perdido: 0 };
+    let totalCampaignsCount = 0;
+
+    if (!limitDateStr && !endDateStr) {
+      // Todo o período - consultas simples sem índice composto
+      const [
+        totalLeadsSnap,
+        totalCampaignsSnap,
+        novoSnap,
+        contatadoSnap,
+        convertidoSnap,
+        perdidoSnap
+      ] = await Promise.all([
+        getCountFromServer(leadsRef),
+        getCountFromServer(campaignsRef),
+        getCountFromServer(query(leadsRef, where('status', '==', 'novo'))),
+        getCountFromServer(query(leadsRef, where('status', '==', 'contatado'))),
+        getCountFromServer(query(leadsRef, where('status', '==', 'convertido'))),
+        getCountFromServer(query(leadsRef, where('status', '==', 'perdido')))
+      ]);
+
+      totalLeadsCount = totalLeadsSnap.data().count;
+      totalCampaignsCount = totalCampaignsSnap.data().count;
+      leadsByStatus = {
+        novo: novoSnap.data().count,
+        contatado: contatadoSnap.data().count,
+        convertido: convertidoSnap.data().count,
+        perdido: perdidoSnap.data().count
+      };
+    } else {
+      // Filtrado por período - busca de leads criados a partir do limitDateStr (consulta de campo único, sem índice composto necessário!)
+      let leadsQ = query(leadsRef);
+      let campaignsQ = query(campaignsRef);
+
+      if (limitDateStr) {
+        leadsQ = query(leadsQ, where('dataCriacao', '>=', limitDateStr));
+        campaignsQ = query(campaignsQ, where('dataCriacao', '>=', limitDateStr));
+      }
+      if (endDateStr) {
+        leadsQ = query(leadsQ, where('dataCriacao', '<=', endDateStr));
+        campaignsQ = query(campaignsQ, where('dataCriacao', '<=', endDateStr));
+      }
+
+      const [leadsSnap, campaignsSnap] = await Promise.all([
+        getDocs(leadsQ),
+        getDocs(campaignsQ)
+      ]);
+
+      totalLeadsCount = leadsSnap.size;
+      totalCampaignsCount = campaignsSnap.size;
+
+      leadsSnap.docs.forEach(doc => {
+        const lead = doc.data() as Lead;
+        if (lead.status && lead.status in leadsByStatus) {
+          leadsByStatus[lead.status as keyof typeof leadsByStatus]++;
+        }
+      });
+    }
+
+    // Buscar outras contagens independentes e rápidas
     const [
-      totalLeadsSnap,
-      totalCampaignsSnap,
       pendentesQueueSnap,
-      leadsHojeSnap
+      leadsHojeSnap,
+      conversasPendentesSnap
     ] = await Promise.all([
-      getCountFromServer(leadsRef),
-      getCountFromServer(campaignsRef),
       getCountFromServer(query(queueRef, where('status', '==', 'pendente'))),
-      getCountFromServer(query(leadsRef, where('dataUltimaAtividade', '>=', todayStr), where('dataUltimaAtividade', '<=', todayStr + '\uf8ff')))
+      getCountFromServer(query(leadsRef, where('dataCriacao', '>=', todayStr), where('dataCriacao', '<=', todayStr + '\uf8ff'))),
+      getCountFromServer(query(chatsRef, where('unreadCount', '>', 0)))
     ]);
 
-    // Buscar últimos 5 leads e 4 campanhas para o dashboard
+    // Buscar leads e campanhas recentes sem usar orderBy no Firestore para evitar erros de índice composto
     const [recentLeadsSnap, recentCampaignsSnap] = await Promise.all([
-      getDocs(query(leadsRef, orderBy('dataUltimaAtividade', 'desc'), firestoreLimit(5))),
-      getDocs(query(campaignsRef, orderBy('dataCriacao', 'desc'), firestoreLimit(4)))
+      getDocs(query(leadsRef, firestoreLimit(100))),
+      getDocs(query(campaignsRef, firestoreLimit(100)))
     ]);
 
-    const recentLeads = recentLeadsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead));
-    const recentCampaigns = recentCampaignsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign));
+    const recentLeads = recentLeadsSnap.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Lead))
+      .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
+      .slice(0, 5);
+
+    const recentCampaigns = recentCampaignsSnap.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Campaign))
+      .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
+      .slice(0, 4);
 
     return {
-      totalLeads: totalLeadsSnap.data().count,
-      totalCampaigns: totalCampaignsSnap.data().count,
+      totalLeads: totalLeadsCount,
+      totalCampaigns: totalCampaignsCount,
       pendentes: pendentesQueueSnap.data().count,
       leadsHoje: leadsHojeSnap.data().count,
+      conversasPendentes: conversasPendentesSnap.data().count,
+      leadsByStatus,
       recentLeads,
       recentCampaigns
     };

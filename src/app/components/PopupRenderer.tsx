@@ -58,12 +58,31 @@ export default function PopupRenderer({ slug }: PopupRendererProps) {
 
       if (popup.trigger === 'exit-intent') {
         const handleMouseLeave = (e: MouseEvent) => {
-          if (e.clientY <= 0) {
+          if (e.clientY < 20 || !e.relatedTarget) {
             showPopup(popup);
           }
         };
         document.addEventListener('mouseleave', handleMouseLeave);
         triggers.push(() => document.removeEventListener('mouseleave', handleMouseLeave));
+
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'hidden') {
+            showPopup(popup);
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        triggers.push(() => document.removeEventListener('visibilitychange', handleVisibilityChange));
+
+        let lastScrollTop = 0;
+        const handleScrollMobile = () => {
+          const st = window.pageYOffset || document.documentElement.scrollTop;
+          if (st < lastScrollTop && st < 150 && lastScrollTop - st > 30) {
+            showPopup(popup);
+          }
+          lastScrollTop = st;
+        };
+        window.addEventListener('scroll', handleScrollMobile, { passive: true });
+        triggers.push(() => window.removeEventListener('scroll', handleScrollMobile));
       }
 
       if (popup.trigger === 'scroll') {
