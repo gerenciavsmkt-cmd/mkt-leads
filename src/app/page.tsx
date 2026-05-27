@@ -281,23 +281,17 @@ export default function Dashboard() {
     let unsubCampaigns: any;
 
     try {
-      const leadsQ = query(collection(db, 'leads'), firestoreLimit(100));
+      const leadsQ = query(collection(db, 'leads'), orderBy('dataCriacao', 'desc'), firestoreLimit(5));
       unsubLeads = onSnapshot(leadsQ, (snap) => {
-        const latestLeads = snap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Lead))
-          .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
-          .slice(0, 5);
+        const latestLeads = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead));
         setRecentLeads(latestLeads);
       });
     } catch (err) { console.error("Erro listener leads:", err); }
 
     try {
-      const campQ = query(collection(db, 'campaigns'), firestoreLimit(100));
+      const campQ = query(collection(db, 'campaigns'), orderBy('dataCriacao', 'desc'), firestoreLimit(4));
       unsubCampaigns = onSnapshot(campQ, (snap) => {
-        const latestCamps = snap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Campaign))
-          .sort((a, b) => new Date(b.dataCriacao || 0).getTime() - new Date(a.dataCriacao || 0).getTime())
-          .slice(0, 4);
+        const latestCamps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign));
         setRecentCampaigns(latestCamps);
       });
     } catch (err) { console.error("Erro listener campanhas:", err); }
@@ -856,27 +850,29 @@ export default function Dashboard() {
 
             const totalLeadsCalculated = channelLeadCounts.facebook + channelLeadCounts.instagram + channelLeadCounts.whatsapp + channelLeadCounts.whatsapp_widget + channelLeadCounts.youtube + channelLeadCounts.tiktok + channelLeadCounts.system;
 
-            // Fontes de Leads a partir de todos os leads de LP carregados
-            const sourceCounts: Record<string, number> = {};
-            let totalLeadsWithSource = 0;
-            filteredLpLeads.forEach(l => {
-              const source = l.origem || 'Outros';
-              sourceCounts[source] = (sourceCounts[source] || 0) + 1;
-              totalLeadsWithSource++;
-            });
+            // Fontes de Leads a partir de todas as fontes de entrada do painel
+            const allSources = [
+              { name: 'Messenger', count: channelLeadCounts.facebook },
+              { name: 'Instagram', count: channelLeadCounts.instagram },
+              { name: 'WhatsApp', count: channelLeadCounts.whatsapp },
+              { name: 'Botão WhatsApp', count: channelLeadCounts.whatsapp_widget },
+              { name: 'YouTube', count: channelLeadCounts.youtube },
+              { name: 'TikTok', count: channelLeadCounts.tiktok },
+              { name: 'Landing Pages', count: channelLeadCounts.system }
+            ];
 
-            const sortedSources = Object.entries(sourceCounts)
-              .map(([name, count]) => ({
-                name,
-                count,
-                percent: totalLeadsWithSource > 0 ? (count / totalLeadsWithSource) : 0
+            const sortedSources = allSources
+              .map(item => ({
+                name: item.name,
+                count: item.count,
+                percent: totalLeadsCalculated > 0 ? (item.count / totalLeadsCalculated) : 0
               }))
               .sort((a, b) => b.count - a.count)
               .slice(0, 4);
 
             while (sortedSources.length < 4) {
               sortedSources.push({
-                name: sortedSources.length === 0 ? 'Sem dados' : 'Outras LPs',
+                name: sortedSources.length === 0 ? 'Sem dados' : 'Outros',
                 count: 0,
                 percent: 0
               });
@@ -958,7 +954,7 @@ export default function Dashboard() {
 
                   {/* Col 3: Fontes de Lead (Radial Rings) */}
                   <div style={{ background: '#111827', borderRadius: '16px', border: '1px solid #1f2937', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                    <h5 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '1rem' }}>Desempenho das Páginas de Captura</h5>
+                    <h5 style={{ fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', color: '#9ca3af', marginBottom: '1rem' }}>Desempenho por Fontes de Entrada</h5>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', flex: 1 }}>
                       {/* SVG Concentric Rings */}

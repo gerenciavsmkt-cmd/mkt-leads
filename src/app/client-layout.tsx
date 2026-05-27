@@ -94,9 +94,11 @@ export default function ClientLayout({
       if (settings.notificacoes?.novosLeads === false) return;
 
       const leadsRef = collection(db, 'leads');
+      const nowIso = new Date().toISOString();
+      const q = query(leadsRef, where('dataUltimaAtividade', '>=', nowIso));
       let isInitialLoad = true;
 
-      unsubscribeLeads = onSnapshot(leadsRef, (snapshot) => {
+      unsubscribeLeads = onSnapshot(q, (snapshot) => {
         if (isInitialLoad) {
           isInitialLoad = false;
           return;

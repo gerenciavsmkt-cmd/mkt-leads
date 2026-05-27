@@ -131,25 +131,16 @@ function LeadsContent() {
   });
 
   const refreshLeads = async () => {
-    // Function kept for backward compatibility with manual refreshes (like after imports)
-    // but onSnapshot handles real-time updates automatically.
+    try {
+      const data = await api.getLeads(1000);
+      setLeads(data);
+    } catch (error) {
+      console.error("Erro ao recarregar leads:", error);
+    }
   };
 
   useEffect(() => {
-    const q = query(collection(db, 'leads'), orderBy('dataCriacao', 'desc'), firestoreLimit(5000));
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Lead));
-      
-      // Ordenar em memória pela data da última atividade (re-conversão) ou criação
-      data.sort((a, b) => {
-        const timeA = new Date(a.dataUltimaAtividade || a.dataCriacao).getTime();
-        const timeB = new Date(b.dataUltimaAtividade || b.dataCriacao).getTime();
-        return timeB - timeA;
-      });
-
-      setLeads(data);
-    });
-    return () => unsub();
+    refreshLeads();
   }, []);
 
   const handleSave = async () => {

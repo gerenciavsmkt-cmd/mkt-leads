@@ -101,22 +101,21 @@ export async function processQueueServerAction() {
 
     console.log(`Processando ${pendingItems.length} itens na fila...`);
 
-    // 4. Buscar Campanhas e Leads necessários para o processamento
+    // 4. Buscar Campanhas necessárias para o processamento
     const campaignsSnap = await getDocs(collection(db, 'campaigns'));
     const campaigns: Campaign[] = [];
     campaignsSnap.forEach(d => campaigns.push({ id: d.id, ...d.data() } as Campaign));
-
-    const leadsSnap = await getDocs(collection(db, 'leads'));
-    const leads: Lead[] = [];
-    leadsSnap.forEach(d => leads.push({ id: d.id, ...d.data() } as Lead));
 
     let processedCount = 0;
 
     for (const item of pendingItems) {
       const campaign = campaigns.find(c => c.id === item.campanhaId);
-      const lead = leads.find(l => l.id === item.leadId);
+      if (!campaign) continue;
 
-      if (!campaign || !lead) continue;
+      // Buscar o lead correspondente sob demanda para economizar leitura de toda a base
+      const leadSnap = await getDoc(doc(db, 'leads', item.leadId));
+      if (!leadSnap.exists()) continue;
+      const lead = { id: leadSnap.id, ...leadSnap.data() } as Lead;
 
       // Incrementar tentativa
       const tentativaAtual = (item.tentativa || 0) + 1;
